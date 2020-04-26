@@ -145,6 +145,9 @@ def mpu_daq(smile_queue):
                             psi.append(math.radians(yaw))
                             the.append(math.radians(pitch))
                             phi.append(math.radians(roll))
+                            accX.append(Accel[0])
+                            accY.append(Accel[1])
+                            accZ.append(Accel[2])
                         else:
                             if os.path.exists('eulang.txt'):
                                 os.remove('eulang.txt')
@@ -154,6 +157,14 @@ def mpu_daq(smile_queue):
                                 eulang_row_to_write = '{:.8f},{:.8f},{:.8f},{:.8f}\r\n'.format(tme[i], psi[i], the[i], phi[i])
                                 eulang_file.write(eulang_row_to_write)
                             print('(KEY) File eulang.txt has been written successfully')
+                            if os.path.exists('accel.txt'):
+                                os.remove('accel.txt')
+                                print('(KEY) File accel.txt has been deleted')
+                            accel_file = open('accel.txt', 'a')
+                            for i in range(len(tme)):
+                                accel_row_to_write = '{:.8f},{:.8f},{:.8f},{:.8f}\r\n'.format(tme[i], accX[i], accY[i], accZ[i])
+                                accel_file.write(accel_row_to_write)
+                            print('(KEY) File accel.txt has been written successfully')
                             return
                     finally: 
                         print('(MPU) Roll: ', roll, ' Pitch: ', pitch, ' Yaw: ', yaw)
