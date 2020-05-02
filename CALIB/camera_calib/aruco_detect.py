@@ -2,9 +2,9 @@ import cv2 as cv
 import numpy as np
 import time
 
-image_list = ['img_'+str(i)+'.jpg' for i in range(16)]
+image_list = ['img_'+str(i)+'.jpg' for i in range(35)]
 
-optimization_file = np.zeros((16,6))
+optimization_file = np.zeros((35,6))
 i=0
 eulang_file = np.genfromtxt('eulang.txt', delimiter=',')
 
@@ -27,15 +27,25 @@ for image_file in image_list:
 
     output_img = np.copy(frame)
     rvec_stack = np.empty((0,3))
+    if rvecs is None:
+        i = i+1
+        continue
     for rvec, tvec in zip(rvecs, tvecs):
-        cv.aruco.drawAxis(output_img, cam_mat, dist, rvec, tvec, 0.05)
+        # cv.aruco.drawAxis(output_img, cam_mat, dist, rvec, tvec, 0.05)
+        print(rvec)
+        if rvec[0,0]<0:
+            rvec = -rvec
         print('Individual rvec: ', rvec)
         rvec_stack = np.append(rvec_stack, rvec, axis=0)
     print('rvec_stack: ', rvec_stack)
     rvec_mean = np.mean(rvec_stack, axis=0)
     print('rvec mean: ', rvec_mean)
+    cv.aruco.drawAxis(output_img, cam_mat, dist, rvec_mean, tvec[0], 0.15)
     optimization_file[i,:] = np.hstack((rvec_mean,eulang_file[i,1:4]))
     i = i+1
+    if i<10:
+        cv.imshow(image_file, output_img)
+        cv.waitKey(0)
 
 np.savetxt('optimize.txt', optimization_file, delimiter=',')
 print('Optimization file has been successfully saved')

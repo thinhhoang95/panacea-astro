@@ -21,6 +21,7 @@ class PanaceaLKFlow(PanaceaFlow):
         super().__init__(img1, img2)
 
     def calculate(self):
+        valid_track = False
         if len(self.tracks) > 0:
                 img0, img1 = self.img1, self.img2
                 p0 = np.float32([tr[-1] for tr in self.tracks]).reshape(-1, 1, 2)
@@ -37,6 +38,7 @@ class PanaceaLKFlow(PanaceaFlow):
                     if len(tr) > self.track_len:
                         del tr[0]
                     new_tracks.append(tr)
+                    valid_track = True
                     # cv.circle(vis, (x, y), 2, (0, 255, 0), -1)
                 self.tracks = new_tracks
                 # print('Size of new tracks: ', np.shape(self.tracks))
@@ -57,4 +59,7 @@ class PanaceaLKFlow(PanaceaFlow):
                 # print('Size of track after append points: ', np.shape(self.tracks))
 
         self.frame_idx += 1
-        return self.tracks
+        if valid_track:
+            return self.tracks
+        else:
+            return None

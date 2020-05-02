@@ -26,8 +26,8 @@ def mpu_daq(smile_queue):
     imu = RTIMU.RTIMU(rtimu_settings)
     # Gyro offsets
     yawoff = 0.0
-    pitchoff = 0.0
-    rolloff = 0.0
+    pitchoff = 5.17
+    rolloff = -4.99
 
     print('Gyro offsets set')
 
@@ -85,6 +85,7 @@ def mpu_daq(smile_queue):
     # Initialization of clocks
     clock = time.time()
     t_begin = time.time()
+    entry = 0 # only output 50 initial MPU readings
 
     print('Variable initialization completed')
     while True:
@@ -134,21 +135,23 @@ def mpu_daq(smile_queue):
                     
                     # print('(MPU) Roll: ', roll, ' Pitch: ', pitch, ' Yaw: ', yaw)
 
+                    # print('(MPU) Keyframe pose data save')
+                    tme.append(clock)
+                    psi.append(math.radians(yaw))
+                    the.append(math.radians(pitch))
+                    phi.append(math.radians(roll))
+                    accX.append(Accel[0])
+                    accY.append(Accel[1])
+                    accZ.append(Accel[2])
+
+                    entry = entry + 1 # count data obtained
+
                     try:
                         smile = smile_queue.get_nowait()
                     except queue.Empty:
                         pass
                     else:
-                        if smile == True:
-                            print('(MPU) Keyframe pose data save')
-                            tme.append(clock)
-                            psi.append(math.radians(yaw))
-                            the.append(math.radians(pitch))
-                            phi.append(math.radians(roll))
-                            accX.append(Accel[0])
-                            accY.append(Accel[1])
-                            accZ.append(Accel[2])
-                        else:
+                        if not smile: # terminate signall obtained from the camera process
                             if os.path.exists('eulang.txt'):
                                 os.remove('eulang.txt')
                                 print('(KEY) File eulang.txt has been deleted')
@@ -167,9 +170,20 @@ def mpu_daq(smile_queue):
                             print('(KEY) File accel.txt has been written successfully')
                             return
                     finally: 
-                        print('(MPU) Roll: ', roll, ' Pitch: ', pitch, ' Yaw: ', yaw)
+                        # print('(MPU) Roll: ', roll, ' Pitch: ', pitch, ' Yaw: ', yaw)
+                        if entry<50:
+                            print('(MPU) Roll: ', roll, ' Pitch: ', pitch, ' Yaw: ', yaw)
+                        elif entry==50:
+                            print('(MPU) MPU data will now be hidden')
                         t_print = hack
                         time.sleep(poll_interval*1.0/1000.0)
+
+def filenames():
+    import time
+    frame = 0
+    while frame<180:
+        yield 'image%04d_%.6f.jpg' % (frame,time.time())
+        frame += 1
 
 def cam_daq_3(smile_queue):
     import queue
@@ -191,23 +205,19 @@ def cam_daq_3(smile_queue):
 
     time.sleep(0.5)
     print('(CAM) Camera initialized')
-
+    time.sleep(15)
+    print('(CAM) You may now pick up the device, capture will begin in 7 seconds')
+    time.sleep(7)
+    capture_duration = 45
+    print('(CAM) Now begin capturing in {:d} seconds'.format(capture_duration))
     clock = time.time()
-    run_until = clock + 25 
+    run_until = clock + 45
 
     while True:
         with camera:
-            captured = 0
-            while True:
-                if time.time() < run_until:
-                    print('(CAM) Capturing image #', captured)
-                    smile_queue.put(True)
-                    camera.capture('img_'+str(captured)+'.jpg')
-                    time.sleep(1)
-                    captured = captured + 1
-                else:
-                    smile_queue.put(False)
-                    return
+            camera.capture_sequence(filenames(), use_video_port=True)
+            smile_queue.put(False) # send terminate signal to the IMU thread
+            return
 
 def main():
     import glob
@@ -216,6 +226,7 @@ def main():
     print('=========================================================')
     print('Panacea DAQ - Data Acquisition for Panacea Landing System')
     print('Author: Hoang Dinh Thinh - University of Corruption')
+    print('Email: hoangdinhthinh@ieee.org')
     print('=========================================================')
     image_list = glob.glob('*.jpg')
     print('Found ', len(image_list), ' image files to delete')

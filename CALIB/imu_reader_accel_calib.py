@@ -17,8 +17,8 @@ imu = RTIMU.RTIMU(s)
 
 # offsets
 yawoff = 0.0
-pitchoff = 0.0
-rolloff = 0.0
+pitchoff = 5.17
+rolloff = -4.99
 
 # timers
 t_print = time.time()

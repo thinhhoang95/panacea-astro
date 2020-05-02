@@ -2,16 +2,20 @@
 % Author: Hoang Dinh Thinh (University of Corruption)
 
 fprintf('Calibration of IMU/Camera Rig \n')
-fprintf('Author: Hoang Dinh Thinh (University of Corruption\n')
+fprintf('Author: Hoang Dinh Thinh (University of Corruption) \n')
 
-x0 = [-0.5, -0.5];
+x0 = [30*pi/180, 1.57];
 
 fprintf('Initial residual: \n');
-disp(norm(rez(x0))^2);
+disp(norm(rez2(x0))^2);
 
-[x, resnorm] = lsqnonlin(@rez,x0);
+options = optimoptions(@lsqnonlin, 'MaxFunctionEvaluations', 5500, 'MaxIterations', 5000);
 
-fprintf('Final result (in degrees and radians): \n')
-disp(x/pi*180)
+[x, resnorm] = lsqnonlin(@rez2,x0,[-3.14,1.3],[3.14,1.8],options);
+
+fprintf('Final result: \n')
 disp(x)
 disp(resnorm)
+
+fprintf('Individual residual: \n')
+disp(rez2(x)/pi*180)
