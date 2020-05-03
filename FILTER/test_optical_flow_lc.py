@@ -24,7 +24,8 @@ class App:
         self.frame_idx = 0
 
     def run(self):
-        image_files = sorted(glob.glob('images/*.jpg'))
+        image_files = glob.glob('images/*0002*') + glob.glob('images/*0004*')
+        # image_files = sorted(glob.glob('images/*.jpg'))
         for image_file in image_files:
             # _ret, frame = self.cam.read()
             frame_gray = cv.imread(image_file, cv.IMREAD_GRAYSCALE)
@@ -68,7 +69,7 @@ class App:
             self.frame_idx += 1
             self.prev_gray = frame_gray
             cv.imshow('lk_track', vis)
-            ch = cv.waitKey(1000)
+            ch = cv.waitKey(5000)
             if ch == 27:
                 break
 

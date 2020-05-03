@@ -63,3 +63,12 @@ class PanaceaLKFlow(PanaceaFlow):
             return self.tracks
         else:
             return None
+    
+    def first_frame_track_generate(self, img1_path):
+        self.img1 = cv.imread(img1_path, cv.IMREAD_GRAYSCALE)
+        mask = np.zeros_like(self.img1)
+        mask[:] = 255
+        p = cv.goodFeaturesToTrack(self.img1, mask = mask, **self.feature_params)
+        if p is not None:
+            for x, y in np.float32(p).reshape(-1, 2):
+                self.tracks.append([(x, y)])

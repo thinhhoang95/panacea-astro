@@ -23,8 +23,8 @@ class PanaceaInertial:
         self.now_pointer = 0 # pointer of current IMU integration state in the window
         self.img0_pointer = 0 # pointer of the acquired img0 in the window
         self.img1_pointer = 0 # pointer of the acquired img1 in the window
-        self.Q_mat = block_diag(0.3 * np.identity(3), 0) # covariance of acceleration
-        self.R_mat = 5E-15 * np.identity(2) # covariance of optical flow measurement
+        self.Q_mat = block_diag(np.diag(np.array([0.1,0.1,0.1])), 0) # covariance of acceleration
+        self.R_mat = 1E-10 * np.identity(2) # covariance of optical flow measurement
         # TODO: kwargs for dynamic settings
 
         # IMPORTING CAMERA PARAMETERS
@@ -37,10 +37,10 @@ class PanaceaInertial:
         self.fy = 3.04E-3
         self.px_scale_x = 5.875E-6
         self.px_scale_y = 5.875E-6
-        #self.fx = focal_length_x * 5.875E-6
-        #self.fy = focal_length_y * 5.708E-6
-        self.cx = cx * self.px_scale_x
-        self.cy = cy * self.px_scale_y
+        # self.fx = focal_length_x * self.px_scale_x
+        # self.fy = focal_length_y * self.px_scale_y
+        self.cx = 320 * self.px_scale_x
+        self.cy = 240 * self.px_scale_y
 
         # IMPORTING RIG CALIBRATION PARAMETERS
         #self.Rito = np.load('rito.pca.npy')
@@ -56,6 +56,10 @@ class PanaceaInertial:
         self.Ritptz = np.array([[-1,0,0],[0,-1,0],[0,0,1]])
         self.Rito = np.array([[math.cos(theta[0]), -math.sin(theta[0]), 0],[math.sin(theta[0]), math.cos(theta[0]), 0],[0,0,1]])
         self.Rbc = np.array([[math.cos(theta[1]), -math.sin(theta[1]), 0],[math.sin(theta[1]), math.cos(theta[1]), 0],[0,0,1]])
+
+        # Logging variables
+        self.res_norm_log = np.empty(0)
+        self.accel_log = np.empty((0,3))
 
 
     '''
@@ -78,15 +82,20 @@ class PanaceaInertial:
         B_mat_3 = np.array([[self.theta[0],0,0,-self.theta[3]],[0,self.theta[1],0,-self.theta[4]],[0,0,self.theta[2],-self.theta[5]]])
         # _mat_3 = np.array([[self.X[self.now_pointer,6],0,0,-self.X[self.now_pointer,9]],[0,self.X[self.now_pointer,7],0,-self.X[self.now_pointer,10]],[0,0,self.X[self.now_pointer,8],-self.X[self.now_pointer,11]]])
         Rbi = Rotation.from_euler('ZYX', ypr).as_dcm()
-        self.YPR[self.now_pointer, :] = ypr
-        u = np.concatenate(((Rbi @ ab.T - np.array([0,0,1]))*9.78206, np.array([1])))
+        # u = np.concatenate(((Rbi @ ab.T - np.array([0,0,1]))*9.78206, np.array([1])))
+        u = np.concatenate(((Rbi @ self.Ritpt @ ab.T + np.array([0,0,1]))*9.78206, np.array([1])))
+        u = np.array([0,0,0,1])
+        self.accel_log = np.vstack((self.accel_log, (Rbi @ self.Ritpt @ ab.T + np.array([0,0,1]))*9.78206))
         B = B_mat_1 @ B_mat_3
         next_state = A_mat @ self.X[self.now_pointer,:].T + B @ u.T
         next_P = A_mat @ self.P[self.now_pointer,:] @ A_mat.T + B @ self.Q_mat @ B.T
+        # Writing history
         self.accel[self.now_pointer, :] = ab
         self.now_pointer = self.now_pointer + 1
+        self.YPR[self.now_pointer, :] = ypr
         self.P[self.now_pointer,:] = next_P 
         self.X[self.now_pointer,:] = next_state.T
+        self.deltat[self.now_pointer] = T
         
 
     '''
@@ -103,7 +112,7 @@ class PanaceaInertial:
             ypr = self.YPR[k, :]
             a = self.accel[k,:]
             Rbi = Rotation.from_euler('ZYX', ypr).as_dcm()
-            u = np.concatenate(((Rbi @ a.T - np.array([0,0,1]))*9.78206, np.array([1])))
+            u = np.concatenate(((Rbi @ self.Ritpt @ a.T + np.array([0,0,1]))*9.78206, np.array([1])))
             B = B_mat_1 @ B_mat_3
             next_state = A_mat @ self.X[self.now_pointer,:].T + B @ u.T
             next_P = A_mat @ self.P[self.now_pointer,:] @ A_mat.T + B @ self.Q_mat @ B.T
@@ -133,20 +142,83 @@ class PanaceaInertial:
             a = self.accel[k,:]
             ypr = self.YPR[k,:]
             Rbi = Rotation.from_euler('ZYX', ypr).as_dcm()
-            A_cs = np.hstack((np.diag(a),-np.identity(3)))
-            A_overline = A_overline + Acc @ B_mat_1 @ Rbi @ A_cs 
+            A_cs = np.hstack((np.diag(Rbi @ a),-np.identity(3)))
+            A_overline = A_overline + Acc @ B_mat_1 @ A_cs 
+        
         # MAP estimation
-        P_mat = A_overline @ self.thetaP @ A_overline.T # state covariance propagation
-        R_mat = Pp + B_overline @ self.P[self.img0_pointer,:] @ B_overline.T
-        H = A_overline
+        P_mat = A_overline @ self.thetaP @ A_overline.T # state (theta - accel's parameters) covariance propagation
         z = X.T - B_overline @ self.X[self.img0_pointer, :].T
+        R_mat = Pp + B_overline @ self.P[self.img0_pointer,:] @ B_overline.T # covariance of z
+        H = A_overline
+
+        # Observation scale factor
+        z_scale = 1E-4
+        z = z * z_scale
+        H = H * z_scale
+
         # Posteriori values
         W = inv(inv(P_mat) + H.T @ inv(R_mat) @ H)
         theta_pos = W @ (H.T @ inv(R_mat) @ z + inv(P_mat) @ self.theta.T)
         cov_pos = W
+
         # Assign to the state
-        self.theta = theta_pos
-        self.thetaP = cov_pos
+        # self.theta = theta_pos
+        # self.thetaP = cov_pos
+
+        #print('Theta pos: ', self.theta)
+        pass
+
+
+    '''
+    Measurement model setup
+    '''
+    def measurement_model(self, Ric_k, Ric_kp, x_kp, x_k, z_k, z_kp, tracks):
+        H_stack = np.empty((0,6))
+        H_stack_pos = np.empty((0,3))
+        lhs_stack = np.empty(0)
+        rhs_stack = np.empty(0)
+        rpj_stack = np.empty(0)
+
+        delta_lm_k = Ric_k.T @ np.array([0, 0, 1])
+        camera_ray_length_k = z_k/delta_lm_k[2]
+        delta_lm_kp = Ric_kp.T @ np.array([0, 0, 1])
+        camera_ray_length_kp = z_kp/delta_lm_kp[2]
+        # Construction of measurement model
+        for track in tracks:
+            if len(track)==1:
+                continue
+            track0 = (track[0][0] * self.px_scale_x, track[0][1] * self.px_scale_x)
+            track1 = (track[1][0] * self.px_scale_y, track[1][1] * self.px_scale_y)
+            S = np.array([[1,0,0,0,0,0],[0,1,0,0,0,0], [0,0,1,0,0,0]]) # select x,y,z in the state vector xyzvxvyvz
+            Hr = np.array([[-self.fx,0,track1[0]-self.cx],[0,-self.fy,track1[1]-self.cy]]) @ Ric_kp
+            H = Hr @ S
+            H_stack_pos = np.concatenate((H_stack_pos, Hr), axis=0) # for OLS estimator
+            H_stack = np.concatenate((H_stack, H), axis=0) # for Kalman filter
+            lhs = H @ x_kp.T
+            lhs_stack = np.append(lhs_stack, lhs)
+            # rhs_lm_pos = z_k * Ric_k.T @ np.array([(track0[0]-self.cx)/self.fx, (track0[1]-self.cy)/self.fy, 1])
+            rhs_lm_pos = camera_ray_length_k * Ric_k.T @ np.array([(track0[0]-self.cx)/self.fx, (track0[1]-self.cy)/self.fy, 1])
+            rhs = Hr @ (rhs_lm_pos + x_k[0:3])
+            #print('-- Pixel @k: ', track[0])
+            #print('-- Point projection @k: ', rhs_lm_pos + x_k[0:3])
+            rhs_stack = np.append(rhs_stack, rhs)
+            # debug variables
+            point_reprojection_0 = camera_ray_length_k * Ric_k.T @ np.array([(track0[0]-self.cx)/self.fx, (track0[1]-self.cy)/self.fy, 1]) + x_k[0:3]
+            point_reprojection_1 = camera_ray_length_kp * Ric_kp.T @ np.array([(track1[0]-self.cx)/self.fx, (track1[1]-self.cy)/self.fy, 1]) + x_kp[0:3]
+            point_reprojection_diff = np.linalg.norm(point_reprojection_1 - point_reprojection_0)
+            rpj_stack = np.append(rpj_stack, point_reprojection_diff)
+            point_reprojection_0 = z_k * Ric_k.T @ np.array([(track0[0])/self.fx, (track0[1])/self.fy, 1]).T + x_k[0:3]
+            point_reprojection_1 = z_kp * Ric_kp.T @ np.array([(track1[0])/self.fx, (track1[1])/self.fy, 1]).T + x_kp[0:3]
+        
+        print('-- Point 0: ', point_reprojection_0)
+        print('-- Point 1: ', point_reprojection_1)
+        
+        residue = rhs_stack - lhs_stack
+        residue_norm = np.sum(residue**2)*10E5/np.shape(residue)[0]
+        print('- Residue is: ', residue_norm)
+        rpj_stack_mean = np.mean(rpj_stack)
+        print('- Reprojection residue is: ', np.mean(rpj_stack))
+        return rhs_stack, lhs_stack, rpj_stack, H_stack, H_stack_pos, residue, residue_norm, rpj_stack_mean
 
     '''
     Perform filter correction based on measurement from the optical flow.
@@ -160,47 +232,18 @@ class PanaceaInertial:
         
         x_kp = self.X[self.img1_pointer,:]
         x_k = self.X[self.img0_pointer,:]
+        
+        #x_kp[2] = -np.abs(x_kp[2])
+        #x_k[2] = -np.abs(x_k[2])
+
         z_k = np.abs(x_k[2])
         z_kp = np.abs(x_kp[2])
         P_kp = self.P[self.img1_pointer,:]
-        H_stack = np.empty((0,6))
-        lhs_stack = np.empty(0)
-        rhs_stack = np.empty(0)
 
-        # Construction of measurement model
-        for track in tracks:
-            if len(track)==1:
-                continue
-            track0 = (track[0][0] * self.px_scale_x, track[0][1] * self.px_scale_x)
-            track1 = (track[1][0] * self.px_scale_y, track[1][1] * self.px_scale_y)
-            # Solve for camera ray length to the landmark whose altitude is zero
-            delta_lm_k = Ric_k.T @ np.array([(track0[0]-self.cx)/self.fx, (track0[1]-self.cy)/self.fy, 1])
-            camera_ray_length_k = z_k/delta_lm_k[2]
-            # delta_lm_kp = Ric_kp.T @ np.array([(track1[0]-self.cx)/self.fx, (track1[1]-self.cy)/self.fy, 1])
-            # camera_ray_length_kp = z_kp/delta_lm_kp[2]
-            S = np.array([[1,0,0,0,0,0],[0,1,0,0,0,0], [0,0,1,0,0,0]]) # select x,y,z in the state vector xyzvxvyvz
-            Hr = np.array([[self.fx,0,track1[0]-self.cx],[0,self.fy,track1[1]-self.cy]]) @ Ric_kp
-            H = Hr @ S
-            H_stack = np.concatenate((H_stack, H), axis=0)
-            lhs = H @ x_kp.T
-            lhs_stack = np.append(lhs_stack, lhs)
-            # rhs_lm_pos = z_k * Ric_k.T @ np.array([(track0[0]-self.cx)/self.fx, (track0[1]-self.cy)/self.fy, 1])
-            rhs_lm_pos = camera_ray_length_k * Ric_k.T @ np.array([(track0[0]-self.cx)/self.fx, (track0[1]-self.cy)/self.fy, 1])
-            rhs = -Hr @ (rhs_lm_pos + x_k[0:3])
-            print('- Pixel @k: ', track[0])
-            print('Point projection @k: ', rhs_lm_pos + x_k[0:3])
-            rhs_stack = np.append(rhs_stack, rhs)
-            # debug variables
-            # point_reprojection_0 = camera_ray_length_k * Ric_k.T @ np.array([(track0[0]-self.cx)/self.fx, (track0[1]-self.cy)/self.fy, 1]).T + x_k[0:3]
-            # point_reprojection_1 = camera_ray_length_kp * Ric_kp.T @ np.array([(track1[0]-self.cx)/self.fx, (track1[1]-self.cy)/self.fy, 1]).T + x_kp[0:3]
-            # point_reprojection_0 = z_k * Ric_k.T @ np.array([(track0[0])/self.fx, (track0[1])/self.fy, 1]).T + x_k[0:3]
-            # point_reprojection_1 = z_kp * Ric_kp.T @ np.array([(track1[0])/self.fx, (track1[1])/self.fy, 1]).T + x_kp[0:3]
-            
-            # print('Point projection 0: ', point_reprojection_0)
-            # print('Point projection 1: ', point_reprojection_1)
-        # Kalman filter
-        residue = rhs_stack - lhs_stack
-        print('Residue is: ', np.sum(residue**2)*10E5/np.shape(residue)[0])
+        rhs_stack, lhs_stack, rpj_stack, H_stack, H_stack_pos, residue, residue_norm, rpj_stack_mean = self.measurement_model(Ric_k, Ric_kp, x_kp, x_k, z_k, z_kp, tracks)
+
+        # Kalman filters
+        self.res_norm_log = np.append(self.res_norm_log, np.sum(residue**2)*10E5/np.shape(residue)[0])
         R_list = [self.R_mat for i in range(int(np.shape(residue)[0]/2))]
         R_augmented = block_diag(*R_list)
         k_gain = P_kp @ H_stack.T @ inv(R_augmented + H_stack @ P_kp @ H_stack.T)
@@ -209,14 +252,22 @@ class PanaceaInertial:
         P_kp_new = (np.identity(6) - k_gain @ H_stack) @ P_kp
 
         print('Current pos: ', x_kp[0:3])
-        print('New pos: ', x_kp_new[0:3])
+
+        # OLS Estimator
+        # x_kp_new_ols = inv(H_stack_pos.T @ H_stack_pos) @ H_stack_pos.T @ residue
+        # print('New pos (OLS): ', x_kp_new_ols)
+        
+        print('New pos (KAL): ', x_kp_new[0:3])
+        print('** After correction **')
+        self.measurement_model(Ric_k, Ric_kp, x_kp_new, x_k, z_k, z_kp, tracks)
         # MAP estimation of accelerometer settings
-        # self.map_theta(x_kp_new, P_kp_new)
+        self.map_theta(x_kp_new, P_kp_new)
 
         # Update state and repropagation from img1_pt to now
+        # self.X[self.img1_pointer, :] = np.hstack((x_kp_new_ols,np.array([0,0,0]))) # <- OLS not KAL
         self.X[self.img1_pointer, :] = x_kp_new
         self.P[self.img1_pointer, :] = P_kp_new
-        self.imu_repropagate(self.img1_pointer, self.now_pointer)
+        # self.imu_repropagate(self.img1_pointer, self.now_pointer)
 
         # Slide the window forward to make img1_pointer the first element
         self.X = np.roll(self.X, -self.img1_pointer, axis=0)
