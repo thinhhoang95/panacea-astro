@@ -18,14 +18,14 @@ feature_params = dict( maxCorners = 500,
 
 class App:
     def __init__(self):
-        self.track_len = 2 # maximum number of points of one track
+        self.track_len = 10 # maximum number of points of one track
         self.detect_interval = 1
         self.tracks = []
         self.frame_idx = 0
-
+        
     def run(self):
-        image_files = glob.glob('images/*0002*') + glob.glob('images/*0004*')
-        # image_files = sorted(glob.glob('images/*.jpg'))
+        # image_files = glob.glob('images/*0002*') + glob.glob('images/*0004*')
+        image_files = sorted(glob.glob('images/*.jpg'))
         for image_file in image_files:
             # _ret, frame = self.cam.read()
             frame_gray = cv.imread(image_file, cv.IMREAD_GRAYSCALE)

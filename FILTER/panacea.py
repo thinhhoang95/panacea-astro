@@ -4,16 +4,17 @@ Author: Hoang Dinh Thinh, Dept. Aerospace Engineering, Univ. Corruption
 Email: hdinhthinh@gmail.com
 '''
 
-from panacea_inertial import PanaceaInertial
+from panacea_inertial_fixed_z import PanaceaInertialFixedZ
 from panacea_lk_flow import PanaceaLKFlow
 import numpy as np
 import glob
 from matplotlib import pyplot as plt
 
 def main():
-    filter = PanaceaInertial()
+    filter = PanaceaInertialFixedZ()
     accel_data = np.genfromtxt('inertial/accel.txt', delimiter=',')
     ypr_data = np.genfromtxt('inertial/eulang.txt', delimiter=',')
+    # image_path = glob.glob('images/*0004*.jpg') + glob.glob('images/*0008*.jpg')
     image_path = glob.glob('images/*.jpg')
     image_info = []
     lk_flow = PanaceaLKFlow(None, None)
@@ -30,7 +31,7 @@ def main():
     x_log = np.empty((0,3))
     t_first = 0
     frame_skip_count = 1
-    frame_skip = 1 # skip 1 image frame
+    frame_skip = 0 # skip 1 image frame
     for accel_row, ypr_row in zip(accel_data, ypr_data):
         time = accel_row[0]
         if (t_first == 0):
@@ -68,7 +69,9 @@ def main():
                     if flow_tracks is not None:
                         # pass
                         print('OF Analysis: ', img0_path, ' > ', img1_path)
-                        filter.cam_correction(flow_tracks) # perform all Panacea filtering and window shifting
+                        x_k, x_kp, Ric_k, Ric_kp, camera_ray_length_k, camera_ray_length_kp, tracks = filter.cam_correction(flow_tracks) # perform all Panacea filtering and window shifting
+                        # show the result
+                        lk_flow.revisualize_of(tracks, x_k, x_kp, camera_ray_length_k, camera_ray_length_kp, Ric_k, Ric_kp)
                     img0_path = img1_path
                     img1_path = ''
                 image_path_cursor = image_path_cursor + 1
@@ -79,8 +82,9 @@ def main():
     plt.plot(t_log, x_log)
     residue_fig = plt.figure(2)
     plt.plot(filter.res_norm_log)
+    plt.plot(filter.res_norm_corrected_log)
     accel_inertial_fig = plt.figure(3)
-    plt.plot(filter.accel_log[:,0:3])
+    plt.plot(filter.res_norm_corrected_ols_log)
     plt.show()
     
 
