@@ -8,9 +8,10 @@
             "name": "Python: Current File",
             "type": "python",
             "request": "launch",
-            "program": "${file}",
+            // "program": "${file}",
+            "program": "panacea3d.py",
             "console": "integratedTerminal",
-            "cwd": "/Users/thinhhoang/Downloads/Panacea_Calibration/FILTER/"
+            "cwd": "C:/Users/USER/Documents/panacea-astro/FILTER/"
         }
     ]
 }
