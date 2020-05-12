@@ -203,7 +203,6 @@ class PanaceaLKFlowMSS(PanaceaFlow):
         # print('Tracks to marginalize ({:d})'.format(len(tracks_marginalize)))
         # print(tracks_marginalize[0:min(len(tracks_marginalize),10)])
 
-        cv.waitKey(3000)
-        if longest_flow_components==0:
-            print('AAA')
+        cv.waitKey(500)
+
         return self.ftracks, tracks_marginalize, oldest_state_index, longest_flow_components

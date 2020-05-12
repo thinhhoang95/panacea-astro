@@ -306,7 +306,29 @@ class PanaceaInertial3DS:
         pass
 
     def mss_measurement_model(self):
+        # The measurement model will include poses and landmarks
+        #         
         pass
 
-    def mss_cam_correction(self):
+    def mss_cam_correction(self, ftracks):
+        for track in ftracks:
+            Ric_track = []
+            x_track = []
+            z_track = []
+            P_track = []
+            index_track = []
+            # for each landmark, obtain the pixel position, camera attitude and camera position for each pose
+            for pose in track:
+                index_track.append(pose[2])
+                Ric_track.append(self.Rito @ Rotation.from_euler('ZYX', self.YPR[self.img1_pointer,:], degrees=False).as_dcm().T @ self.Rbc)
+                x_kp = self.X[self.img1_pointer,:]
+                x_k = self.X[self.img0_pointer,:]
+                
+                #x_kp[2] = -np.abs(x_kp[2])
+                #x_k[2] = -np.abs(x_k[2])
+
+                z_k = np.abs(x_k[2])
+                z_kp = np.abs(x_kp[2])
+                P_kp = self.P[self.img1_pointer,:]
+
         pass
