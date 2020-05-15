@@ -65,14 +65,16 @@ def main():
                     # Both images are available, perform filtering!
                     lk_flow.set_frame(img0_path, img1_path)
                     filter.set_img_pointer(filter.img0_pointer, filter.now_pointer)
-                    ftracks, tracks_marginalize, oldest_state_index, longest_flow_components = lk_flow.detect_and_match(filter.roll_pointer + filter.img0_pointer, filter.roll_pointer + filter.img1_pointer)
-                    print('Track size: {:d}; Track to marginalize: {:d}, Oldest State Index: {:d}/{:d}, Longest components: {:d}'.format(len(ftracks), len(tracks_marginalize), oldest_state_index, filter.roll_pointer + filter.img1_pointer, longest_flow_components))
+                    ftracks, tracks_marginalize, oldest_state_index_ftracks, oldest_state_index_marginalize, longest_flow_components, longest_frame_count = lk_flow.detect_and_match(filter.roll_pointer + filter.img0_pointer, filter.roll_pointer + filter.img1_pointer)
+                    oldest_state_index = min(oldest_state_index_ftracks, oldest_state_index_marginalize)
+                    print('Track size: {:d}; Track to marginalize: {:d}, Oldest State Index: {:d}/{:d}, Longest components: {:d}, Longest frame count: {:d}'.format(len(ftracks), len(tracks_marginalize), oldest_state_index, filter.roll_pointer + filter.img1_pointer, longest_flow_components, longest_frame_count))
                     flow_tracks = lk_flow.calculate() # calculate the optical flow between two images
                     if flow_tracks is not None:
-                        # pass
+                        # perform MSS correction
+                        filter.mss_cam_correction(tracks_marginalize)
+                        # perform OF correction
                         print('OF Analysis: ', img0_path, ' > ', img1_path)
-                        x_k, x_kp, Ric_k, Ric_kp, camera_ray_length_k, camera_ray_length_kp, tracks = filter.cam_correction(flow_tracks) # perform all Panacea filtering and window shifting
-                        # show the result
+                        x_k, x_kp, Ric_k, Ric_kp, camera_ray_length_k, camera_ray_length_kp, tracks = filter.cam_correction(flow_tracks, oldest_state_index - filter.roll_pointer) # perform all Panacea filtering and window shifting
                         lk_flow.revisualize_of(tracks, x_k, x_kp, camera_ray_length_k, camera_ray_length_kp, Ric_k, Ric_kp)
                     img0_path = img1_path
                     img1_path = ''

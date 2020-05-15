@@ -175,7 +175,9 @@ class PanaceaLKFlowMSS(PanaceaFlow):
                     tracks_modified.append(trk)
                     match_completed = True
         
-        oldest_state_index = 9999
+        oldest_state_index_ftracks = 9999
+        oldest_state_index_marginalize = 9999
+        longest_frame_count = 0
         longest_flow_components = 0
 
         original_ftracks = self.ftracks.copy()
@@ -186,10 +188,19 @@ class PanaceaLKFlowMSS(PanaceaFlow):
                 if same_track: # the considering track is maintained in ftracks and recently modified
                     modified_track_found = True
                     longest_flow_components = max(longest_flow_components, len(track))
-                    oldest_state_index = min(track[0][2], oldest_state_index)
-            if not modified_track_found: # find old tracks that are not updated in the preceeding code block
+                    oldest_state_index_ftracks = min(track[0][2], oldest_state_index_ftracks)
+            if not modified_track_found and len(track)>=4: # find old tracks that are not updated in the preceeding code block and holds at least 4 keyframes
                 tracks_marginalize.append(track.copy())
+                oldest_state_index_marginalize = min(oldest_state_index_marginalize, track[0][2])
                 self.ftracks.remove(track)
+            elif not modified_track_found and len(track)<4: # old tracks that do not carry information for more than 4 keyframes
+                self.ftracks.remove(track)
+        
+        # Re-evaluate the frame count after altering the ftracks
+        for track in self.ftracks:
+            frame_count = len(track)
+            if frame_count > longest_frame_count:
+                longest_frame_count = frame_count
                 
         draw_params = dict(matchColor = (0,255,0),
                    singlePointColor = (255,0,0),
@@ -205,4 +216,4 @@ class PanaceaLKFlowMSS(PanaceaFlow):
 
         cv.waitKey(500)
 
-        return self.ftracks, tracks_marginalize, oldest_state_index, longest_flow_components
+        return self.ftracks, tracks_marginalize, oldest_state_index_ftracks, oldest_state_index_marginalize, longest_flow_components, longest_frame_count

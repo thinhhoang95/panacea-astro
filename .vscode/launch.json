@@ -4,14 +4,15 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+        
         {
             "name": "Python: Current File",
             "type": "python",
             "request": "launch",
-            // "program": "${file}",
+            //"program": "${file}",
             "program": "panacea3d.py",
             "console": "integratedTerminal",
-            "cwd": "C:/Users/USER/Documents/panacea-astro/FILTER/"
+            "cwd": "/Users/thinhhoang/Downloads/Panacea_Calibration/FILTER"
         }
     ]
 }
