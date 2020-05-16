@@ -12,7 +12,8 @@
             //"program": "${file}",
             "program": "panacea3d.py",
             "console": "integratedTerminal",
-            "cwd": "/Users/thinhhoang/Downloads/Panacea_Calibration/FILTER"
+            // "cwd": "/Users/thinhhoang/Downloads/Panacea_Calibration/FILTER"
+            "cwd": "C:/Users/USER/Documents/panacea-astro/FILTER"
         }
     ]
 }

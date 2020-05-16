@@ -14,7 +14,7 @@ def main():
     filter = PanaceaInertial3DS()
     accel_data = np.genfromtxt('inertial/accel.txt', delimiter=',')
     ypr_data = np.genfromtxt('inertial/eulang.txt', delimiter=',')
-    # image_path = glob.glob('images/*0004*.jpg') + glob.glob('images/*0008*.jpg')
+    #image_path = glob.glob('images/*0125*.jpg') + glob.glob('images/*0126*.jpg') + glob.glob('images/*0127*.jpg') + glob.glob('images/*0128*.jpg')
     image_path = glob.glob('images/*.jpg')
     image_info = []
     lk_flow = PanaceaLKFlowMSS(None, None)
@@ -31,6 +31,7 @@ def main():
     x_log = np.empty((0,3))
     t_first = 0
     frame_skip_count = 1
+    oldest_state_index = 0
     frame_skip = 0 # skip 1 image frame
     for accel_row, ypr_row in zip(accel_data, ypr_data):
         time = accel_row[0]
@@ -66,18 +67,28 @@ def main():
                     lk_flow.set_frame(img0_path, img1_path)
                     filter.set_img_pointer(filter.img0_pointer, filter.now_pointer)
                     ftracks, tracks_marginalize, oldest_state_index_ftracks, oldest_state_index_marginalize, longest_flow_components, longest_frame_count = lk_flow.detect_and_match(filter.roll_pointer + filter.img0_pointer, filter.roll_pointer + filter.img1_pointer)
-                    oldest_state_index = min(oldest_state_index_ftracks, oldest_state_index_marginalize)
+                    oldest_state_index_0 = min(oldest_state_index_ftracks, oldest_state_index_marginalize)
+                    if oldest_state_index_0 != 9999: # ftracks and marginalize tracks are empty
+                        oldest_state_index = oldest_state_index_0
                     print('Track size: {:d}; Track to marginalize: {:d}, Oldest State Index: {:d}/{:d}, Longest components: {:d}, Longest frame count: {:d}'.format(len(ftracks), len(tracks_marginalize), oldest_state_index, filter.roll_pointer + filter.img1_pointer, longest_flow_components, longest_frame_count))
                     flow_tracks = lk_flow.calculate() # calculate the optical flow between two images
-                    if flow_tracks is not None:
-                        # perform MSS correction
-                        filter.mss_cam_correction(tracks_marginalize)
-                        # perform OF correction
-                        print('OF Analysis: ', img0_path, ' > ', img1_path)
-                        x_k, x_kp, Ric_k, Ric_kp, camera_ray_length_k, camera_ray_length_kp, tracks = filter.cam_correction(flow_tracks, oldest_state_index - filter.roll_pointer) # perform all Panacea filtering and window shifting
-                        lk_flow.revisualize_of(tracks, x_k, x_kp, camera_ray_length_k, camera_ray_length_kp, Ric_k, Ric_kp)
-                    img0_path = img1_path
-                    img1_path = ''
+                    valid_tracks_in_flow_tracks = len(flow_tracks)
+                    for track in flow_tracks:
+                        if len(track)==1:
+                            valid_tracks_in_flow_tracks = valid_tracks_in_flow_tracks - 1
+                    if(valid_tracks_in_flow_tracks < 7): # at least 7 flow tracks are required
+                        # too little information for odometry
+                        print('<!> Frame ', img1_path, ' was skipped due to inssuficient odometry information available')
+                    else:
+                        if flow_tracks is not None:
+                            # perform MSS correction
+                            filter.mss_cam_correction(tracks_marginalize)
+                            # perform OF correction
+                            print('OF Analysis: ', img0_path, ' > ', img1_path)
+                            x_k, x_kp, Ric_k, Ric_kp, camera_ray_length_k, camera_ray_length_kp, tracks = filter.cam_correction(flow_tracks, oldest_state_index - filter.roll_pointer) # perform all Panacea filtering and window shifting
+                            lk_flow.revisualize_of(tracks, x_k, x_kp, camera_ray_length_k, camera_ray_length_kp, Ric_k, Ric_kp)
+                        img0_path = img1_path
+                        img1_path = ''
                 image_path_cursor = image_path_cursor + 1
             last_time = time
         else:

@@ -95,10 +95,10 @@ class PanaceaLKFlowMSS(PanaceaFlow):
                 # print('Size of track after append points: ', np.shape(self.tracks))
 
         self.frame_idx += 1
-        # cv.imshow('lk_track', vis)
-        # ch = cv.waitKey(1500)
-        # if ch == 27: # user presses esc
-        #     sys.exit('User manually quitted the optical flow display')
+        cv.imshow('lk_track', vis)
+        ch = cv.waitKey(1500)
+        if ch == 27: # user presses esc
+            sys.exit('User manually quitted the optical flow display')
         if valid_track:
             return self.tracks
         else:
@@ -127,10 +127,10 @@ class PanaceaLKFlowMSS(PanaceaFlow):
             landmark_in_camera = Ric_kp @ (landmark_position - np.concatenate((x_kp[0:2],-1.67), axis=None))
             landmark_image = (self.fx * landmark_in_camera[0:2]/landmark_in_camera[2] + np.array([self.cx, self.cy])) / self.px_scale_x
             cv.polylines(vis, np.int32([[track[0]] + [(landmark_image[0],landmark_image[1])]]), False, (0, 255, 0))
-        # cv.imshow('lk_track', vis)
-        # ch = cv.waitKey(1500)
-        # if ch == 27: # user presses esc
-        #     sys.exit('User manually quitted the optical flow display')
+        cv.imshow('lk_track', vis)
+        ch = cv.waitKey(1500)
+        if ch == 27: # user presses esc
+            sys.exit('User manually quitted the optical flow display')
 
     '''
     Detect SIFT keypoints in the frame
@@ -208,13 +208,13 @@ class PanaceaLKFlowMSS(PanaceaFlow):
                    matchesMask = matchesMask,
                    flags = 0)
         img3 = cv.drawMatchesKnn(self.img1,kp1,self.img2,kp2,matches,None,**draw_params)
-        # cv.imshow('Matching', img3)
+        cv.imshow('Matching', img3)
 
-        # # print('Tracks ({:d})'.format(len(self.ftracks)))
-        # # print(self.ftracks[0:min(len(self.ftracks),10)])
-        # # print('Tracks to marginalize ({:d})'.format(len(tracks_marginalize)))
-        # # print(tracks_marginalize[0:min(len(tracks_marginalize),10)])
+        # print('Tracks ({:d})'.format(len(self.ftracks)))
+        # print(self.ftracks[0:min(len(self.ftracks),10)])
+        # print('Tracks to marginalize ({:d})'.format(len(tracks_marginalize)))
+        # print(tracks_marginalize[0:min(len(tracks_marginalize),10)])
 
-        # cv.waitKey(200)
+        cv.waitKey(200)
 
         return self.ftracks, tracks_marginalize, oldest_state_index_ftracks, oldest_state_index_marginalize, longest_flow_components, longest_frame_count
