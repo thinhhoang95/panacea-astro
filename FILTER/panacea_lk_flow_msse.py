@@ -18,11 +18,17 @@ class PanaceaLKFlowMSS(PanaceaFlow):
                         minDistance = 3,
                         blockSize = 5 )
     ftracks = [] # contains the multi-keyframe points
+
+    show_cv_debug = False
+
     def __init__(self, img1, img2):
         super().__init__(img1, img2)
         self.track_len = 2 # maximum number of points of one track
         self.detect_interval = 1 # feature points are generated every 1 frame
         self.tracks = []
+        
+        self.maximum_gap_allowed_in_mss = 33 # maximum gap allowed for missing keyframes in the feature tracking track (consult this variable in action below)
+
         self.frame_idx = 0
         self.fx = 3.04E-3
         self.fy = 3.04E-3
@@ -54,7 +60,10 @@ class PanaceaLKFlowMSS(PanaceaFlow):
     def set_frame(self, img1, img2):
         super().__init__(img1, img2)
 
-    def calculate(self):
+    def set_mss_frame(self, img1):
+        super().mss_init(img1)
+
+    def calculate(self): # calculate the optical flow
         valid_track = False
         vis = self.img2.copy() # draw the optical tracks on this vis object
         if len(self.tracks) > 0:
@@ -95,14 +104,15 @@ class PanaceaLKFlowMSS(PanaceaFlow):
                 # print('Size of track after append points: ', np.shape(self.tracks))
 
         self.frame_idx += 1
-        cv.imshow('lk_track', vis)
-        ch = cv.waitKey(1500)
-        if ch == 27: # user presses esc
-            sys.exit('User manually quitted the optical flow display')
+        if self.show_cv_debug:
+            cv.imshow('lk_track', vis)
+            ch = cv.waitKey(200)
+            if ch == 27: # user presses esc
+                sys.exit('User manually quitted the optical flow display')
         if valid_track:
             return self.tracks
         else:
-            return None
+            return []
     
     def first_frame_track_generate(self, img1_path):
         self.img1 = cv.imread(img1_path, cv.IMREAD_GRAYSCALE)
@@ -122,25 +132,28 @@ class PanaceaLKFlowMSS(PanaceaFlow):
             track0 = (track[0][0] * self.px_scale_x, track[0][1] * self.px_scale_y)
             # Backproject the point from track[0]
             rhs_lm_pos = camera_ray_length_k * Ric_k.T @ np.array([(track0[0]-self.cx)/self.fx, (track0[1]-self.cy)/self.fy, 1])
-            landmark_position = rhs_lm_pos + np.concatenate((x_k[0:2], -1.67), axis=None)
+            # landmark_position = rhs_lm_pos + np.concatenate((x_k[0:2], -1.67), axis=None)
+            landmark_position = rhs_lm_pos + x_k[0:3]
             # Project the point to form track[1]
-            landmark_in_camera = Ric_kp @ (landmark_position - np.concatenate((x_kp[0:2],-1.67), axis=None))
+            landmark_in_camera = Ric_kp @ (landmark_position - x_kp[0:3])
             landmark_image = (self.fx * landmark_in_camera[0:2]/landmark_in_camera[2] + np.array([self.cx, self.cy])) / self.px_scale_x
             cv.polylines(vis, np.int32([[track[0]] + [(landmark_image[0],landmark_image[1])]]), False, (0, 255, 0))
-        cv.imshow('lk_track', vis)
-        ch = cv.waitKey(1500)
-        if ch == 27: # user presses esc
-            sys.exit('User manually quitted the optical flow display')
+        
+        if self.show_cv_debug:
+            cv.imshow('lk_track', vis)
+            ch = cv.waitKey(1500)
+            if ch == 27: # user presses esc
+                sys.exit('User manually quitted the optical flow display')
 
     '''
-    Detect SIFT keypoints in the frame
+    Detect ORB keypoints in the frame
     Output: tracks, tracks_marginalize
     '''
     def detect_and_match(self, state_no_1, state_no_2):
         orb = cv.ORB_create(500)
         # sift = cv.xfeatures2d.SIFT_create()
         # Detect keypoints and calculate descriptors
-        kp1, des1 = orb.detectAndCompute(self.img1, None)
+        kp1, des1 = orb.detectAndCompute(self.img1_mss, None)
         kp2, des2 = orb.detectAndCompute(self.img2, None)
         # BF matcher
         bf = cv.BFMatcher()
@@ -184,22 +197,34 @@ class PanaceaLKFlowMSS(PanaceaFlow):
         original_ftracks = self.ftracks.copy()
         for track in original_ftracks:
             modified_track_found = False
+            recover_from_gap = False
             for mtrack in tracks_modified:
                 same_track = all(item in track for item in mtrack)
                 if same_track: # the considering track is maintained in ftracks and recently modified
                     modified_track_found = True
+                    if len(track)>=2 and state_no_2 - track[-2][-1] >= 20: # and state_no_1>0 (use this for image dataset not starting from pointer 0): # 10-11 IMU samples per camera image!
+                        # Track recently recovered from gap, mark as marginalization
+                        recover_from_gap = True
                     longest_flow_components = max(longest_flow_components, len(track))
-                    oldest_state_index_ftracks = min(track[0][2], oldest_state_index_ftracks)
-            if not modified_track_found and len(track)>=self.minimum_marginalized_track_len: # find old tracks that are not updated in the preceeding code block and holds at least 4 keyframes
+            
+            kf_gap_in_track = state_no_2 - track[-1][-1] # e.g. 150, 161, 180 -> missing 170, gap = 180-161 = 19
+
+            if not modified_track_found and len(track)>=self.minimum_marginalized_track_len and kf_gap_in_track >= self.maximum_gap_allowed_in_mss: # find old tracks that are not updated in the preceeding code block (not recently appended into ftracks - as they hold only 2 keyframes and might be appended in the future), holds at least 4 keyframes and the gap (current to last keyframe) is more than 33
+                tracks_marginalize.append(track.copy()) # too old tracks that might not get appended in the future with strong likelihood
+                oldest_state_index_marginalize = min(oldest_state_index_marginalize, track[0][2])
+                self.ftracks.remove(track)
+            elif modified_track_found and recover_from_gap: # tracks that recently recover from gap are destined to marginalize
                 tracks_marginalize.append(track.copy())
                 oldest_state_index_marginalize = min(oldest_state_index_marginalize, track[0][2])
                 self.ftracks.remove(track)
-            elif not modified_track_found and len(track)<self.minimum_marginalized_track_len: # old tracks that do not carry information for more than 4 keyframes
-                self.ftracks.remove(track)
-        
+            elif not modified_track_found and len(track)<self.minimum_marginalized_track_len and kf_gap_in_track >= self.maximum_gap_allowed_in_mss: # old tracks that do not carry information for more than 4 keyframes and the gap is more than 33 -> fuck 'em and forget about 'em
+                self.ftracks.remove(track) # too old tracks that might not get appended in the future with very little information (holds less than 4 keyframes)
+            # Any track whose gap is less than 33 is retained for further possible growth
+
         # Re-evaluate the frame count after altering the ftracks
         for track in self.ftracks:
             frame_count = len(track)
+            oldest_state_index_ftracks = min(track[0][2], oldest_state_index_ftracks)
             if frame_count > longest_frame_count:
                 longest_frame_count = frame_count
                 
@@ -208,13 +233,14 @@ class PanaceaLKFlowMSS(PanaceaFlow):
                    matchesMask = matchesMask,
                    flags = 0)
         img3 = cv.drawMatchesKnn(self.img1,kp1,self.img2,kp2,matches,None,**draw_params)
-        cv.imshow('Matching', img3)
+        if self.show_cv_debug:
+            cv.imshow('Matching', img3)
 
         # print('Tracks ({:d})'.format(len(self.ftracks)))
         # print(self.ftracks[0:min(len(self.ftracks),10)])
         # print('Tracks to marginalize ({:d})'.format(len(tracks_marginalize)))
         # print(tracks_marginalize[0:min(len(tracks_marginalize),10)])
 
-        cv.waitKey(200)
+            cv.waitKey(200)
 
         return self.ftracks, tracks_marginalize, oldest_state_index_ftracks, oldest_state_index_marginalize, longest_flow_components, longest_frame_count
