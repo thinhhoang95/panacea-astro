@@ -22,7 +22,8 @@ class PanaceaInertial3DS:
         self.accel = np.zeros((self.window_size, 3)) # logging the acceleration
         self.deltat = np.zeros(self.window_size) # dt matrix
         self.now_pointer = 0 # pointer of current IMU integration state in the window
-        self.img0_pointer = 0 # pointer of the acquired img0 in the window
+        self.img0_pointer = 0 # pointer of the acquired img0 in the window, for optical flow analysis
+        self.img0_mss_pointer = 0 # pointer of the acquired img0 in the window, for MSS analysis
         self.img1_pointer = 0 # pointer of the acquired img1 in the window
         self.roll_pointer = 0
         self.Q_mat = np.diag(1E-4 * np.array([5,5,5])) # covariance of acceleration
@@ -72,6 +73,9 @@ class PanaceaInertial3DS:
     def set_img_pointer(self, cursor0, cursor1):
         self.img0_pointer = cursor0
         self.img1_pointer = cursor1
+
+    def set_img_pointer_mss(self, cursor0):
+        self.img0_mss_pointer = cursor0
 
     '''
     Propagate IMU state upon receive of new acceleration
@@ -191,10 +195,10 @@ class PanaceaInertial3DS:
         delta_lm_k = Ric_k.T @ np.array([0, 0, 1])
         # camera_ray_length_k = 1.67/delta_lm_k[2]
         # camera_ray_length_k = x_k[2]/delta_lm_k[2]
-        camera_ray_length_k = np.abs(x_k[2]/delta_lm_k[2])
+        camera_ray_length_k = -x_k[2]/delta_lm_k[2]
         delta_lm_kp = Ric_kp.T @ np.array([0, 0, 1])
         # camera_ray_length_kp = 1.67/delta_lm_kp[2]
-        camera_ray_length_kp = np.abs(x_kp[2]/delta_lm_kp[2])
+        camera_ray_length_kp = -x_kp[2]/delta_lm_kp[2]
         # Construction of measurement model
         for track in tracks:
             if len(track)==1:
@@ -238,18 +242,32 @@ class PanaceaInertial3DS:
         #print('- Reprojection residue is: ', np.mean(rpj_stack))
         return rhs_stack, lhs_stack, rpj_stack, H_stack, H_stack_pos, residue, residue_norm, rpj_stack_mean, camera_ray_length_k, camera_ray_length_kp
 
+    def slide_window(self, pointer_destination):
+        # Slide the window forward to make img1_pointer the first element
+        self.X = np.roll(self.X, -pointer_destination, axis=0)
+        self.roll_pointer = self.roll_pointer + pointer_destination
+        self.P = np.roll(self.P, -pointer_destination, axis=0)
+        self.YPR = np.roll(self.YPR, -pointer_destination, axis=0)
+        self.accel = np.roll(self.accel, -pointer_destination, axis=0)
+        self.deltat = np.roll(self.deltat, -pointer_destination, axis=0)
+        self.now_pointer = self.now_pointer - pointer_destination
+        
+        self.img0_pointer = self.img1_pointer - pointer_destination
+        self.img1_pointer = self.img1_pointer - pointer_destination # to be updated in subsequent run
+
     '''
     Perform filter correction based on measurement from the optical flow.
     The standard optical flow tracks vector has many tracks, each with 2 points
     '''
     def cam_correction(self, tracks, pointer_destination):
+        img0_pointer = self.img0_pointer
         # Ric_kp = self.Ritpt @ self.Rito @ Rotation.from_euler('ZYX', self.YPR[self.img1_pointer,:], degrees=False).as_dcm() @ self.Rbc
         # Ric_k = self.Ritpt @ self.Rito @ Rotation.from_euler('ZYX', self.YPR[self.img0_pointer,:], degrees=False).as_dcm() @ self.Rbc
         Ric_kp = self.Rito @ Rotation.from_euler('ZYX', self.YPR[self.img1_pointer,:], degrees=False).as_dcm().T @ self.Rbc
-        Ric_k = self.Rito @ Rotation.from_euler('ZYX', self.YPR[self.img0_pointer,:], degrees=False).as_dcm().T @ self.Rbc
+        Ric_k = self.Rito @ Rotation.from_euler('ZYX', self.YPR[img0_pointer,:], degrees=False).as_dcm().T @ self.Rbc
         
         x_kp = self.X[self.img1_pointer,:]
-        x_k = self.X[self.img0_pointer,:]
+        x_k = self.X[img0_pointer,:]
         
         #x_kp[2] = -np.abs(x_kp[2])
         #x_k[2] = -np.abs(x_k[2])
@@ -295,19 +313,9 @@ class PanaceaInertial3DS:
         self.P[self.img1_pointer, 0:3, 0:3] = P_kp_new
         # self.imu_repropagate(self.img1_pointer, self.now_pointer)
 
-        # Slide the window forward to make img1_pointer the first element
-        self.X = np.roll(self.X, -pointer_destination, axis=0)
-        self.roll_pointer = self.roll_pointer + pointer_destination
-        self.P = np.roll(self.P, -pointer_destination, axis=0)
-        self.YPR = np.roll(self.YPR, -pointer_destination, axis=0)
-        self.accel = np.roll(self.accel, -pointer_destination, axis=0)
-        self.deltat = np.roll(self.deltat, -pointer_destination, axis=0)
-        self.now_pointer = self.now_pointer - pointer_destination
-        
-        self.img0_pointer = self.img1_pointer - pointer_destination
-        self.img1_pointer = self.img1_pointer - pointer_destination # to be updated in subsequent run
+        self.slide_window(pointer_destination)
 
-        print('Roll Pointer {:d}, Image 0 Pointer: {:d}, Image 1 Pointer: {:d}'.format(self.roll_pointer, self.img0_pointer, self.img1_pointer))
+        print('(OF) Roll Pointer: {:d}, Image 0 Pointer: {:d}, Image 1 Pointer: {:d}'.format(self.roll_pointer, self.img0_pointer, self.img1_pointer))
 
         return x_k, x_kp, Ric_k, Ric_kp, camera_ray_length_k, camera_ray_length_kp, tracks
 
@@ -400,7 +408,7 @@ class PanaceaInertial3DS:
             x_at_obs = self.X[window_index_of_lm,0:3]
             Ric_at_obs = self.Rito @ Rotation.from_euler('ZYX', self.YPR[window_index_of_lm,:], degrees=False).as_dcm().T @ self.Rbc
             delta_lm_k = Ric_at_obs.T @ np.array([0, 0, 1])
-            camera_ray_length_k = np.abs(x_at_obs[2]/delta_lm_k[2])
+            camera_ray_length_k = -x_at_obs[2]/delta_lm_k[2]
             lm_prediction = Ric_at_obs.T @ np.array([camera_ray_length_k * first_observation_of_lm[0] * self.px_scale_x / self.fx, camera_ray_length_k * first_observation_of_lm[1] * self.px_scale_y / self.fy, camera_ray_length_k])
             x_vec = np.concatenate((x_vec, lm_prediction[0:2]), axis=None)
             # Processing measurements
@@ -438,8 +446,8 @@ class PanaceaInertial3DS:
         for no, imu_true_index in enumerate(track_association[0]):
             window_index = imu_true_index - self.roll_pointer #e.g. 131
             a, b = self.get_state_vec_index(*track_association, 'pose', imu_true_index)
-            #self.X[window_index,0:3] = x_vec_new[a:b+1]
-            #self.P[window_index,0:3,0:3] = P_matrix_new[a:b+1,a:b+1]
+            self.X[window_index,0:3] = x_vec_new[a:b+1]
+            self.P[window_index,0:3,0:3] = P_matrix_new[a:b+1,a:b+1]
             if no==len(track_association[0])-1: # print upon completion of processing the last track
                 print('New pos (KAL/MSS): ', x_vec_new[a:b+1])
                 # time.sleep(1)
