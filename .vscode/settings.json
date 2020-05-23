@@ -1,3 +1,5 @@
 {
-    "editor.fontWeight": "500"
+    "editor.fontWeight": "500",
+    "python.linting.pylintEnabled": true,
+    "python.linting.enabled": true
 }
