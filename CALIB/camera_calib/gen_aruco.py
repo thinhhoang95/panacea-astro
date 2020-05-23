@@ -4,7 +4,7 @@ import numpy as np
 # Load the predefined dictionary
 dictionary = cv.aruco.Dictionary_get(cv.aruco.DICT_6X6_250)
 
-aruco_id = [21,22,23,24,25]
+aruco_id = [0,1,2,3,4,5]
 
 for id in aruco_id:
     print('Generating aruco tag for ID ', id)

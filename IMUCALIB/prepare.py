@@ -7,6 +7,8 @@ import numpy as np
 from scipy.spatial.transform import Rotation
 import glob
 import cv2 as cv
+import os
+import scipy.io as io
 
 def get_tag_pos(tag_id):
     if tag_id==0:
@@ -22,9 +24,14 @@ run_directories = [x[0] for x in os.walk('.')]
 
 for dir in run_directories:
 
+    print('Now processing directory ', dir)
+
     accel_file = np.genfromtxt(dir + '/inertial/accelerometer.txt', delimiter=',')
     eulang_file = np.genfromtxt(dir + '/inertial/eulang.txt', delimiter=',')
     image_path = glob.glob(dir + '/images/*.jpg')
+
+    print('This directory has {:d} IMU entries and {:d} camera samples'.format(np.shape(accel_file)[0], len(image_path)))
+
     image_info = []
     # Convert image name timestamp to a numpy vector
     for img_path in image_path:
@@ -116,3 +123,7 @@ for dir in run_directories:
                     x_init_stack = np.concatenate((x_init_stack, x_initial), axis=0)
                     weight_stack = np.concatenate((weight_stack,(time - clock_started)**2))
                 image_path_cursor = image_path_cursor + 1
+
+# Export the matrices to MATLAB filetype
+io.savemat('top.mat', {'Aoverline': A_overline_stack, 'Boverline': B_overline_stack, 'rhs': rhs_stack, 'xinit': x_init_stack, 'weight': weight_stack})
+print('File top.mat has been successfully saved. Now run the MATLAB script to optimize!')
