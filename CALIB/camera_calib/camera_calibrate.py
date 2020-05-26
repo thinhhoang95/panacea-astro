@@ -18,7 +18,7 @@ imgpoints = []
 
 # Defining the world coordinates for 3D points
 objp = np.zeros((1, CHECKERBOARD[0] * CHECKERBOARD[1], 3), np.float32)
-objp[0,:,:2] = np.mgrid[0:CHECKERBOARD[0], 0:CHECKERBOARD[1]].T.reshape(-1, 2)
+objp[0,:,:2] = (0.02 * np.mgrid[0:CHECKERBOARD[0], 0:CHECKERBOARD[1]]).T.reshape(-1, 2)
 objp = objp * 23
 prev_img_shape = None
 
@@ -47,7 +47,7 @@ for fname in images:
         img = cv2.drawChessboardCorners(img, CHECKERBOARD, corners2, ret)
     
     cv2.imshow('img',img)
-    time.sleep(0.2)
+    cv2.waitKey(500)
 
 cv2.destroyAllWindows()
 

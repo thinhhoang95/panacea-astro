@@ -10,10 +10,11 @@
             "type": "python",
             "request": "launch",
             //"program": "${file}",
-            "program": "panacea3d.py",
+            "program": "prepare.py",
             "console": "integratedTerminal",
-            "cwd": "/Users/thinhhoang/Downloads/Panacea_Calibration/FILTER"
-            //"cwd": "C:/Users/USER/Documents/panacea-astro/FILTER"
+            //"cwd": "/Users/thinhhoang/Downloads/Panacea_Calibration/FILTER"
+            "cwd": "C:/Users/USER/Documents/panacea-astro/IMUCALIB/"
+            //"cwd": "C:/Users/USER/Documents/panacea-astro/CALIB/camera_calib"
         }
     ]
 }

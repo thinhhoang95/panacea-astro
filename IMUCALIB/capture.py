@@ -5,20 +5,22 @@
 # Department of Aerospace Engineering, University of Corruption, Ho Chi Minh City, Vietnam
 
 # This is the edition that allows multiprocessing
-from multiprocessing import Lock, Process, Queue, current_process
+from multiprocessing import Lock, Process, Queue, Value, current_process
+import ctypes
+from pathlib import Path
 
 # Maximum runs control
 max_runs = 10
 runs = ['run_{:d}'.format(i) for i in range(max_runs)]
 current_dir_lock = Lock()
-current_dir = 0 # first entry in runs
+current_dir = Value(ctypes.c_int16, 0)
 
 # DAQ for MPU (acceleration and Euler angles)
 def mpu_daq(smile_queue):
     import RTIMU
     import sys 
     import math
-    import keyboard
+    # import keyboard
     import os
     import io
     import time
@@ -34,8 +36,8 @@ def mpu_daq(smile_queue):
     imu = RTIMU.RTIMU(rtimu_settings)
     # Gyro offsets
     yawoff = 0.0
-    pitchoff = 5.17
-    rolloff = -4.99
+    pitchoff = 0
+    rolloff = 0
 
     print('Gyro offsets set')
 
@@ -159,8 +161,9 @@ def mpu_daq(smile_queue):
                     except queue.Empty:
                         pass
                     else:
-                        if not smile: # terminate signall obtained from the camera process
-                            suffix = runs[current_dir]
+                        if smile=='end_run': # terminate signal obtained from the camera process
+                            suffix = runs[current_dir.value]
+                            print('(KEY) Suffix for IMU data: ' + suffix)
                             if os.path.exists(suffix+'/inertial/eulang.txt'):
                                 os.remove(suffix+'/inertial/eulang.txt')
                                 print('(KEY) File eulang.txt has been deleted')
@@ -176,13 +179,23 @@ def mpu_daq(smile_queue):
                             for i in range(len(tme)):
                                 accel_row_to_write = '{:.8f},{:.8f},{:.8f},{:.8f}\r\n'.format(tme[i], accX[i], accY[i], accZ[i])
                                 accel_file.write(accel_row_to_write)
-                            print('(KEY) File accel.txt has been written successfully')
+                            print('(KEY) File accelerometer.txt has been written successfully')
+                        elif smile=='reset': # reset all variables if smile True is received
+                            tme = [] 
+                            accX = []
+                            accY = []
+                            accZ = []
+                            phi = []
+                            the = []
+                            psi = []
+                            print('IMU memory has been successfully reset')
+                        else:
                             return
                     finally: 
                         # print('(MPU) Roll: ', roll, ' Pitch: ', pitch, ' Yaw: ', yaw)
-                        if entry<50:
+                        if entry<10:
                             print('(MPU) Roll: ', roll, ' Pitch: ', pitch, ' Yaw: ', yaw)
-                        elif entry==50:
+                        elif entry==100:
                             print('(MPU) MPU data will now be hidden')
                         t_print = hack
                         time.sleep(poll_interval*1.0/1000.0)
@@ -191,8 +204,8 @@ def filenames():
     global current_dir, runs
     import time
     frame = 0
-    while frame<15: # maximum camera samples goes here
-        yield runs[current_dir] + '/images/image%04d_%.6f.jpg' % (frame,time.time())
+    while frame<10: # maximum camera samples goes here
+        yield runs[current_dir.value] + '/images/image%04d_%.6f.jpg' % (frame,time.time())
         frame += 1
 
 def cam_daq_3(smile_queue):
@@ -205,17 +218,26 @@ def cam_daq_3(smile_queue):
     # Initialization of camera
     camera = PiCamera()
     camera.resolution = (640, 480)
-    camera.framerate = 8
-    time.sleep(3)
-    camera.shutter_speed = camera.exposure_speed
-    camera.exposure_mode = 'off'
-    g = camera.awb_gains
-    camera.awb_mode = 'off'
-    camera.awb_gains = g
-    rawCapture = PiRGBArray(camera, size=(640,480))
-
+    camera.framerate = 2
+    #time.sleep(3)
+    #camera.shutter_speed = camera.exposure_speed
+    #camera.iso = 400
+    #camera.exposure_mode = 'off'
+    #time.sleep(3)
+    #g = camera.awb_gains
+    #camera.awb_mode = 'off'
+    #camera.awb_gains = g
+    #rawCapture = PiRGBArray(camera, size=(640,480))
     time.sleep(0.5)
     print('(CAM) Camera initialized')
+
+    # Create directories
+    for run in range(max_runs):
+        Path('./run_' + str(run) + '/images').mkdir(parents=True, exist_ok=True)
+        Path('./run_' + str(run) + '/inertial').mkdir(parents=True, exist_ok=True)
+    
+    print('Directory created')
+
     time.sleep(15)
     print('(CAM) You may now pick up the device, capture will begin in 7 seconds')
     time.sleep(7)
@@ -224,18 +246,22 @@ def cam_daq_3(smile_queue):
     #clock = time.time()
     #run_until = clock + capture_duration
 
-    print('Now begin capturing for 15 camera samples...')
-
     while True:
         with camera:
-            camera.capture_sequence(filenames(), use_video_port=True)
-            smile_queue.put(False) # send terminate signal to the IMU thread
             # switch to the next run (next directory in line)
-            with current_dir_lock:
-                if current_dir < max_runs:
-                    current_dir = current_dir + 1
-                else:
-                    print('Run has completed')
+            while current_dir.value < max_runs:
+                print('(CAM) Now begin capturing for 15 camera samples for run {:d}...'.format(current_dir.value))
+                camera.capture_sequence(filenames(), use_video_port=False)
+                smile_queue.put('end_run') # send terminate signal to the IMU thread
+                print('(CAM) Put the camera back to the original position. Next run will start in 5s...')
+                time.sleep(1)
+                smile_queue.put('reset') # reset all IMU stacks
+                time.sleep(5)
+                with current_dir_lock:
+                    current_dir.value = current_dir.value + 1
+            print('(CAM) Runs have completed')
+            print('(CAM) Requesting to terminate IMU proceess')
+            smile_queue.put('stop')
             return
 
 def main():
