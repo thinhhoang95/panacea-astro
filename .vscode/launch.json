@@ -12,8 +12,8 @@
             //"program": "${file}",
             "program": "prepare.py",
             "console": "integratedTerminal",
-            //"cwd": "/Users/thinhhoang/Downloads/Panacea_Calibration/FILTER"
-            "cwd": "C:/Users/USER/Documents/panacea-astro/IMUCALIB/"
+            "cwd": "/Users/thinhhoang/Downloads/Panacea_Calibration/IMUCALIB/"
+            //"cwd": "C:/Users/USER/Documents/panacea-astro/IMUCALIB/"
             //"cwd": "C:/Users/USER/Documents/panacea-astro/CALIB/camera_calib"
         }
     ]

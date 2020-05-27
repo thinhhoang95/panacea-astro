@@ -31,13 +31,20 @@ run_directories = ['run_'+str(i) for i in range(10)]
 # Variables to hold components of measurements
 Rbi_stack = np.empty((0,3,3))
 A_overline_stack = np.empty((0,6,9))
+a_overline_stack = np.empty((0,6,3))
 B_overline_stack = np.empty((0,6,6))
+Rtc_stack = np.empty((0,3,3))
 rhs_stack = np.empty((0,3))
 x_init_stack = np.empty((0,6))
 xt_stack = np.empty((0,3))
 weight_stack = np.empty(0)
 # debug stacks
 ai_stack_dbg = np.empty((0,3))
+x_stack_dbg = np.empty((0,6))
+x_dbg = np.zeros(6)
+
+# Useful constants
+Ritip = np.array([[1,0,0],[0,-1,0],[0,0,-1]]) # flip y and z axis
 
 for dir in run_directories:
 
@@ -91,20 +98,26 @@ for dir in run_directories:
                 rvecs, tvecs, *other = cv.aruco.estimatePoseSingleMarkers(markerCorners, 0.088, cam_mat, dist)
                 if image_path_cursor == 0:
                     # TODO: First frame is used for determination of the initial condition
+                    x_dbg = np.zeros(6)
                     x0_stack = np.empty((0,6))
                     clock_started = time
                     for tag_id, rvec, tvec in zip(markerIds, rvecs, tvecs):
                         xt = get_tag_pos(tag_id[0])
                         Rtc = Rotation.from_rotvec(rvec[0]).as_matrix()
-                        x0 = np.concatenate((-Rtc @ xt + tvec[0], np.array([0,0,0])))
+                        x0 = np.concatenate((Ritip @ (xt + Rtc.T @ -tvec[0]), np.array([0,0,0])))
                         x0_stack = np.concatenate((x0_stack, [x0]), axis=0)
                         print('Initial position obtained: ', x0[0:3])
+                        # cv.aruco.drawAxis(image_draw, cam_mat, dist, rvec[0], tvec[0], 0.15)
+                    # cv.imshow('Image '+image_info[image_path_cursor][1], image_draw)
+                    # cv.waitKey(30000)
+                    # cv.destroyAllWindows()
                     x_initial = np.average(x0_stack, axis=0)
                     image_path_cursor = image_path_cursor + 1
                     continue # done with the first image
                 image_sample = k
                 # Calculation of A_overline
                 A_overline = np.zeros((6,9))
+                a_overline = np.zeros((6,3))
                 ypr = eulang_file[k,1:]
                 Rbi = Rotation.from_euler('ZYX', ypr).as_matrix()
                 for kp in range(image_sample): # sum over kp
@@ -118,39 +131,50 @@ for dir in run_directories:
                     # B_mat_2 = ...
                     # B_mat_3 = np.array([[self.theta[0],0,0,-self.theta[3],0,0],[0,self.theta[1],0,0,self.theta[4],0],[0,0,self.theta[2],0,0,self.theta[5]]])
                     # B_mat_3 = np.array([[self.X[self.now_pointer,6],0,0,-self.X[self.now_pointer,9]],[0,self.X[self.now_pointer,7],0,-self.X[self.now_pointer,10]],[0,0,self.X[self.now_pointer,8],-self.X[self.now_pointer,11]]])
-                    a = -accel_file[k,1:]
+                    a = -accel_file[kp,1:]
                     ai = (Rbi @ a + np.array([0,0,1])) * 9.78206 # acceleration in the inertial frame
                     ai_stack_dbg = np.concatenate((ai_stack_dbg, [ai]), axis=0)
-                    a_x = ai[0]
-                    a_y = ai[1]
-                    a_z = ai[2]
+                    x_dbg = A_mat @ x_dbg + B_mat_1 @ ai
+                    x_stack_dbg = np.concatenate((x_stack_dbg, [x_dbg]), axis=0)
+                    a_x = a[0]*9.78206
+                    a_y = a[1]*9.78206
+                    a_z = a[2]*9.78206
                     a_circle_k = np.concatenate((np.array([[a_x,a_y,a_z,0,0,0],[0,0,0,a_y,a_z,0],[0,0,0,0,0,a_x]]), np.eye(3)), axis=1)
-                    A_overline = A_overline + Acc @ B_mat_1 @ a_circle_k
+                    A_overline = A_overline + Acc @ B_mat_1 @ Rbi @ a_circle_k
+                    a_overline = a_overline + Acc @ B_mat_1
                 # A_overline and B_overline is available, we proceed onto establishment of the measurement model for each ARUCO observation
                 if markerIds is None or rvecs is None or tvecs is None:
                     print('This image does contain a ARUCO tag')
                     image_path_cursor = image_path_cursor + 1
                     continue
                 print('Found {:d} ARUCO tags'.format(len(markerIds)))
+                cam_pos_estimate = np.empty((0,6))
                 for tag_id, rvec, tvec in zip(markerIds, rvecs, tvecs):
                     Rbi_stack = np.concatenate((Rbi_stack, Rbi[None,...].copy()), axis=0)
                     A_overline_stack = np.concatenate((A_overline_stack, A_overline[None,...].copy()), axis=0)
                     B_overline_stack = np.concatenate((B_overline_stack, B_overline[None,...].copy()), axis=0)
-                    xt = get_tag_pos(tag_id)
-                    Rtc = Rotation.from_rotvec(rvec).as_matrix()
+                    a_overline_stack = np.concatenate((a_overline_stack, a_overline[None,...].copy()), axis=0)
+                    xt = get_tag_pos(tag_id[0])
+                    Rtc = Rotation.from_rotvec(rvec[0]).as_matrix()
+                    Rtc_stack = np.concatenate((Rtc_stack, Rtc[None,...].copy()), axis=0)
                     # rhs = -Rtc @ xt + tvec
-                    rhs = tvec.copy()
-                    rhs_stack = np.concatenate((rhs_stack, rhs.copy()), axis=0)
+                    rhs = -tvec[0].copy()
+                    rhs_stack = np.concatenate((rhs_stack, rhs[None,...].copy()), axis=0)
                     x_init_stack = np.concatenate((x_init_stack, [x_initial.copy()]), axis=0)
-                    weight_stack = np.concatenate((weight_stack,[(time - clock_started)**2]))
+                    weight_stack = np.concatenate((weight_stack,[(time - clock_started)]))
                     xt_stack = np.concatenate((xt_stack, [xt.copy()]))
                     # Draw the markers
                     cv.aruco.drawAxis(image_draw, cam_mat, dist, rvec[0], tvec[0], 0.15)
+                    cam_pos = np.concatenate((Ritip @ (xt + Rtc.T @ -tvec[0]), np.array([0,0,0])))
+                    cam_pos_estimate = np.concatenate((cam_pos_estimate, [cam_pos]), axis=0)
+                    cv.putText(image_draw, str(cam_pos[0:3]), (10,10*np.shape(cam_pos_estimate)[0]), cv.FONT_HERSHEY_SIMPLEX, 0.4, (255,0,0,255), 1)
+                cam_pos_average = np.average(cam_pos_estimate, axis=0)
+                # cv.putText(image_draw, str(cam_pos_average), (10,10), cv.FONT_HERSHEY_SIMPLEX, 0.4, (255,0,0,255), 1)
                 cv.imshow('Image '+image_info[image_path_cursor][1], image_draw)
-                cv.waitKey(100)
+                cv.waitKey(0)
                 cv.destroyAllWindows()
                 image_path_cursor = image_path_cursor + 1
 
 # Export the matrices to MATLAB filetype
-io.savemat('top.mat', {'Aoverline': A_overline_stack, 'Boverline': B_overline_stack, 'rhs': rhs_stack, 'xinit': x_init_stack, 'weight': weight_stack, 'Rbi': Rbi_stack, 'xt': xt_stack})
+io.savemat('top.mat', {'Aoverline': A_overline_stack, 'Boverline': B_overline_stack, 'rhs': rhs_stack, 'xinit': x_init_stack, 'weight': weight_stack, 'Rbi': Rbi_stack, 'xt': xt_stack, 'aoverline': a_overline_stack, 'Rtc': Rtc_stack, 'x_dbg': x_stack_dbg})
 print('File top.mat has been successfully saved. Now run the MATLAB script to optimize!')
