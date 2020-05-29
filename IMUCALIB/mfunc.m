@@ -19,7 +19,9 @@ for i=1:length(xinit)
     xts = xt(i,:);
     Bov = reshape(Boverline(i,:,:),6,6);
     % Rbis = reshape(Rbi(i,:,:),3,3);
-    Rtcs = reshape(Rtc(i,:,:),3,3); 
-    L(3*i+1:3*i+3) = 1/weight(i)^4 * ([eye(3),zeros(3)] * (Aov * x(1:9)' + aov * [0 0 1]' + Bov * [R1' * xinit(i,1:3)'; 0; 0; 0]) - R1' * Ritip * xts' - R1' * Ritip * Rtcs' * rhs(i,:)');
+    Rtcs = reshape(Rtc(i,:,:),3,3);
+    % Predicted position in IMU's frame
+    x_hat = [eye(3),zeros(3)] * (Aov * x(1:9)' + aov * [0 0 9.78206]' + Bov * [R1' * xinit(i,1:3)'; 0; 0; 0]);
+    L(3*i+1:3*i+3) = 1/weight(i)^4 * (x_hat - R1' * Ritip * xts' - R1' * Ritip * Rtcs' * rhs(i,:)');
 end
 end
