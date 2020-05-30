@@ -19,7 +19,7 @@ class PanaceaLKFlowMSS(PanaceaFlow):
                         blockSize = 5 )
     ftracks = [] # contains the multi-keyframe points
 
-    show_cv_debug = False
+    show_cv_debug = True
 
     def __init__(self, img1, img2):
         super().__init__(img1, img2)
@@ -46,7 +46,7 @@ class PanaceaLKFlowMSS(PanaceaFlow):
 
         # theta = [26.0982*math.pi/180, 84.3910*math.pi/180] # 5.025 first residue
         # theta = [-26.0982*math.pi/180, 84.3910*math.pi/180] # 6.894 first residue
-        theta = [0*math.pi/180, -84.3910*math.pi/180] # 3.318 first residue
+        theta = [0*math.pi/180, 84.3910*math.pi/180] # 3.318 first residue
 
 
         self.Ritpt = np.array([[1,0,0],[0,-1,0],[0,0,-1]])

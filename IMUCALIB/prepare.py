@@ -193,7 +193,7 @@ for dir in run_directories:
                 cv.putText(image_draw, str('x_hat: ' + str(x_hat)), (10,10), cv.FONT_HERSHEY_SIMPLEX, 0.4, (255,0,0,255), 1)
                 cv.putText(image_draw, str('x_dbg: ' + str(x_dbg)), (10,20), cv.FONT_HERSHEY_SIMPLEX, 0.4, (255,0,0,255), 1)
                 cv.imshow('Image '+image_info[image_path_cursor][1], image_draw)
-                cv.waitKey(100)
+                cv.waitKey(1000)
                 cv.destroyAllWindows()
                 image_path_cursor = image_path_cursor + 1
             
