@@ -27,7 +27,7 @@ class PanaceaInertial3DS:
         self.img0_mss_pointer = 0 # pointer of the acquired img0 in the window, for MSS analysis
         self.img1_pointer = 0 # pointer of the acquired img1 in the window
         self.roll_pointer = 0
-        self.Q_mat = np.diag(1E-20 * np.array([5,5,5])) # covariance of acceleration
+        self.Q_mat = np.diag(1E-4 * np.array([5,5,5])) # covariance of acceleration
         self.R_mat = 1E-8 * np.identity(2) # covariance of optical flow measurement
         
         # MSS Kalman Parameters
@@ -296,10 +296,11 @@ class PanaceaInertial3DS:
         k_gain = P_kp @ H_stack.T @ inv(R_augmented + H_stack @ P_kp @ H_stack.T)
         delta_x_kp = k_gain @ residue
         # x_kp_new = x_kp + np.concatenate((delta_x_kp,np.array([0,0,0])), axis=None)
-        # x_kp_new = x_kp + delta_x_kp # Kalman / with prior
+        x_kp_new_kal = x_kp + delta_x_kp # Kalman / with prior
         # OLS Estimator
         x_kp_new_ols = inv(H_stack_pos.T @ H_stack_pos) @ H_stack_pos.T @ rhs_stack # camera seulement
-        x_kp_new = np.concatenate((x_kp_new_ols,np.array([0,0,0])), axis=None)
+        x_kp_new = x_kp_new_kal # use Kalman Filter
+        # x_kp_new = np.concatenate((x_kp_new_ols,np.array([0,0,0])), axis=None) # use OLS filter
         P_kp_new = (np.identity(6) - k_gain @ H_stack) @ P_kp
 
         print('Cov (KAL): {:e},{:e},{:e} => {:e},{:e},{:e}'.format(P_kp[0,0], P_kp[1,1], P_kp[2,2], P_kp_new[0,0], P_kp_new[1,1], P_kp_new[2,2]))
@@ -309,14 +310,15 @@ class PanaceaInertial3DS:
         # print('New pos (OLS/OTF): ', x_kp_new_o)
         
         #print('Delta x (KAL): ', delta_x_kp)
-        print('New pos (KAL/OTF): ', x_kp_new)
+        print('New pos (KAL/OTF): ', x_kp_new_kal)
         print('New pos (OLS/OTF): ', x_kp_new_ols)
         #print('** After correction **')
         rhs_stack, lhs_stack, rpj_stack, H_stack, H_stack_pos, residue, residue_norm, rpj_stack_mean, camera_ray_length_k, camera_ray_length_kp = self.measurement_model(Ric_k, Ric_kp, x_kp_new, x_k, z_k, z_kp, tracks)
         self.res_norm_corrected_log = np.append(self.res_norm_corrected_log, residue_norm)
-        print('KAL/OTF change in residual: {:f} => {:f}'.format(residue_norm_before, residue_norm))
+        print('OTF change in residual: {:f} => {:f}'.format(residue_norm_before, residue_norm))
         #rhs_stack, lhs_stack, rpj_stack, H_stack, H_stack_pos, residue, residue_norm, rpj_stack_mean, camera_ray_length_k, camera_ray_length_kp = self.measurement_model(Ric_k, Ric_kp, np.concatenate((x_kp_new_ols, -1.67), axis=None), x_k, z_k, z_kp, tracks)
         #self.res_norm_corrected_ols_log = np.append(self.res_norm_corrected_ols_log, residue_norm)
+        # print('KAL/OTF change in residual: {:f} => {:f}'.format(residue_norm_before, residue_norm))
         # MAP estimation of accelerometer settings
         # self.map_theta(x_kp_new, P_kp_new)
 

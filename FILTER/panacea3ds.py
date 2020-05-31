@@ -90,8 +90,8 @@ def main():
                         if flow_tracks is not None:
                             # perform MSS correction
                             ftracks, tracks_marginalize, oldest_state_index_ftracks, oldest_state_index_marginalize, longest_flow_components, longest_frame_count = lk_flow.detect_and_match(filter.roll_pointer + filter.img0_mss_pointer, filter.roll_pointer + filter.img1_pointer)
-                            filter.mss_cam_correction(tracks_marginalize)
-                            oldest_state_index = min(oldest_state_index_ftracks, oldest_state_index_marginalize)
+                            #filter.mss_cam_correction(tracks_marginalize)
+                            #oldest_state_index = min(oldest_state_index_ftracks, oldest_state_index_marginalize)
                             # perform OF correction
                             print('OF Analysis: ', img0_path, ' > ', img1_path)
                             x_k, x_kp, Ric_k, Ric_kp, camera_ray_length_k, camera_ray_length_kp, tracks = filter.cam_correction(flow_tracks, oldest_state_index - filter.roll_pointer) # perform all Panacea filtering and window shifting
