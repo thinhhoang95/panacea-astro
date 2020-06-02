@@ -208,6 +208,14 @@ estimated_misalignmentMatrix = [1, -theta_pr_opt(1), theta_pr_opt(2); 0, 1, -the
 estimated_scalingMatrix = diag([theta_pr_opt(4), theta_pr_opt(5), theta_pr_opt(6)]);
 estimated_biasVector = [theta_pr_opt(7); theta_pr_opt(8); theta_pr_opt(9)];
 
+fprintf('Set in the INI file: \n');
+fprintf('Skew X, Y, Z: ');
+disp(theta_pr_opt(1:3));
+fprintf('Scale X, Y, Z: ');
+disp(theta_pr_opt(4:6));
+fprintf('Bias X, Y, Z: ');
+disp(theta_pr_opt(7:9));
+
 s_filter = zeros(1, total_sample);
 
 figure

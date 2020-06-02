@@ -72,7 +72,7 @@ magnetic_deviation = -13.7
 clock = time.time()
 t_begin = time.time()
 t_end = time.time() + float(program_duration)
-
+    
 print('Program begins at ' + str(t_begin))
 print('Program will run until ' + str(t_end))
 

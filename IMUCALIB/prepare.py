@@ -26,6 +26,9 @@ def get_tag_pos(tag_id):
     else:
         return None
 
+# flags
+each_frame_as_initial_flag = True # if False, the first frame of the run will serve as initial position, otherwise, the last frame
+
 run_directories = ['run_'+str(i) for i in range(10)]
 
 # Variables to hold components of measurements
@@ -35,7 +38,8 @@ a_overline_stack = np.empty((0,6,3))
 B_overline_stack = np.empty((0,6,6))
 Rtc_stack = np.empty((0,3,3))
 rhs_stack = np.empty((0,3))
-x_init_stack = np.empty((0,6))
+x_init_stack = np.empty((0,6)) # initial position from beginning of run
+x_init_fstack = np.empty((0,6)) # initial position from last frame obtained
 xt_stack = np.empty((0,3))
 weight_stack = np.empty(0)
 T_stack = np.empty(0)
@@ -157,6 +161,9 @@ for dir in run_directories:
                     a_circle_k = np.concatenate((np.array([[a_x,a_y,a_z,0,0,0],[0,0,0,a_y,a_z,0],[0,0,0,0,0,a_z]]), np.eye(3)), axis=1)
                     A_overline = A_overline + Acc @ Bm @ Rbi @ a_circle_k
                     a_overline = a_overline + Acc @ Bm
+
+                if each_frame_as_initial_flag:
+                    k_start = kp
                 
                 
                 # A_overline and B_overline is available, we proceed onto establishment of the measurement model for each ARUCO observation
@@ -186,12 +193,16 @@ for dir in run_directories:
                     cam_pos_estimate = np.concatenate((cam_pos_estimate, [cam_pos]), axis=0)
                     # cv.putText(image_draw, str(cam_pos[0:3]), (10,10*np.shape(cam_pos_estimate)[0]), cv.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255,255), 1)
                 cam_pos_average = np.average(cam_pos_estimate, axis=0)
+                if each_frame_as_initial_flag:
+                    x_initial = cam_pos_average.copy() # TODO: delete or comment out this 
+                    print('Initial has been reset to ', x_initial)
                 ai_stack_dbg = np.concatenate((ai_stack_dbg, [ai]), axis=0)
                 x_hat = A_overline @ np.array([1,0,0,1,0,1,0,0,0]).T + a_overline @ np.array([0,0,9.78206]).T + B_overline @ x_initial.T
                 #print('x_hat: ', x_hat)
                 #print('x_dbg: ', x_dbg)
-                cv.putText(image_draw, str('x_hat: ' + str(x_hat)), (10,10), cv.FONT_HERSHEY_SIMPLEX, 0.4, (255,0,0,255), 1)
-                cv.putText(image_draw, str('x_dbg: ' + str(x_dbg)), (10,20), cv.FONT_HERSHEY_SIMPLEX, 0.4, (255,0,0,255), 1)
+                cv.putText(image_draw, str('x_hat: ' + str(x_hat)), (10,10), cv.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255,255), 1)
+                cv.putText(image_draw, str('x_dbg: ' + str(x_dbg)), (10,20), cv.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255,255), 1)
+                cv.putText(image_draw, str('x_init: ' + str(x_initial)), (10,30), cv.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255,255), 1)
                 cv.imshow('Image '+image_info[image_path_cursor][1], image_draw)
                 cv.waitKey(1000)
                 cv.destroyAllWindows()
