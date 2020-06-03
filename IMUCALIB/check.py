@@ -11,20 +11,23 @@ import os
 import scipy.io as io
 
 def get_tag_pos(tag_id):
-    if tag_id==5:
+    if tag_id==0:
         return np.array([0,0,0])
-    elif tag_id==4:
-        return np.array([0.093,0,0])
-    elif tag_id==3:
-        return np.array([0.186,0,0])
-    elif tag_id==0:
-        return np.array([0,-0.094,0])
-    elif tag_id==2:
-        return np.array([0.093,-0.094,0])
     elif tag_id==1:
-        return np.array([0.186,-0.093,0])
+        return np.array([0.09,0,0])
+    elif tag_id==2:
+        return np.array([0.18,0,0])
+    elif tag_id==3:
+        return np.array([0,-0.092,0])
+    elif tag_id==4:
+        return np.array([0.09,-0.092,0])
+    elif tag_id==5:
+        return np.array([0.18,-0.092,0])
     else:
         return None
+
+# flags
+each_frame_as_initial_flag = True # if False, the first frame of the run will serve as initial position, otherwise, the last frame
 
 run_directories = ['run_'+str(i) for i in range(10)]
 
@@ -35,7 +38,8 @@ a_overline_stack = np.empty((0,6,3))
 B_overline_stack = np.empty((0,6,6))
 Rtc_stack = np.empty((0,3,3))
 rhs_stack = np.empty((0,3))
-x_init_stack = np.empty((0,6))
+x_init_stack = np.empty((0,6)) # initial position from beginning of run
+x_init_fstack = np.empty((0,6)) # initial position from last frame obtained
 xt_stack = np.empty((0,3))
 weight_stack = np.empty(0)
 T_stack = np.empty(0)
@@ -106,7 +110,7 @@ for dir in run_directories:
                 dist = np.load('dist.pca.npy')
                 # Detect the markers in the image
                 markerCorners, markerIds, rejectedCandidates = cv.aruco.detectMarkers(frame, dictionary, parameters=parameters)
-                rvecs, tvecs, *other = cv.aruco.estimatePoseSingleMarkers(markerCorners, 0.088, cam_mat, dist)
+                rvecs, tvecs, *other = cv.aruco.estimatePoseSingleMarkers(markerCorners, 0.086, cam_mat, dist)
                 if image_path_cursor == 0:
                     # TODO: First frame is used for determination of the initial condition
                     x0_stack = np.empty((0,6))
@@ -186,13 +190,18 @@ for dir in run_directories:
                     cam_pos_estimate = np.concatenate((cam_pos_estimate, [cam_pos]), axis=0)
                     # cv.putText(image_draw, str(cam_pos[0:3]), (10,10*np.shape(cam_pos_estimate)[0]), cv.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255,255), 1)
                 cam_pos_average = np.average(cam_pos_estimate, axis=0)
+                if each_frame_as_initial_flag:
+                    x_initial = cam_pos_average.copy() # TODO: delete or comment out this 
+                    B_overline = np.eye(6) # reset B_overline
+                    print('Initial has been reset to ', x_initial)
+                    k_start = k # reset A_overline
                 ai_stack_dbg = np.concatenate((ai_stack_dbg, [ai]), axis=0)
-                # x_hat = A_overline @ np.array([1,0,0,1,0,1,0,0,0]).T + a_overline @ np.array([0,0,9.78206]).T + B_overline @ x_initial.T
-                x_hat = A_overline @ np.array([0.9732,-0.0173,-0.0670,0.9798,-0.0206,0.7942,-0.6102,-0.1906,-1.6795]).T + a_overline @ np.array([0,0,9.78206]).T + B_overline @ x_initial.T
+                x_hat = A_overline @ np.array([0.8894,0.0297,-0.1052,0.9500,-0.0847,0.9028,-1.0043,-0.7695,-0.7234]).T + a_overline @ np.array([0,0,9.78206]).T + B_overline @ x_initial.T
                 #print('x_hat: ', x_hat)
                 #print('x_dbg: ', x_dbg)
                 cv.putText(image_draw, str('x_hat: ' + str(x_hat)), (10,10), cv.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255,255), 1)
-                cv.putText(image_draw, str('x_dbg: ' + str(x_dbg)), (10,20), cv.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255,255), 1)
+                cv.putText(image_draw, str('x_dbg: ' + str(x_dbg)), (10,30), cv.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255,255), 1)
+                cv.putText(image_draw, str('x_init (reset): ' + str(x_initial)), (10,20), cv.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255,255), 1)
                 cv.imshow('Image '+image_info[image_path_cursor][1], image_draw)
                 cv.waitKey(1000)
                 cv.destroyAllWindows()
@@ -210,5 +219,5 @@ for dir in run_directories:
             
 
 # Export the matrices to MATLAB filetype
-io.savemat('top.mat', {'Aoverline': A_overline_stack, 'Boverline': B_overline_stack, 'rhs': rhs_stack, 'xinit': x_init_stack, 'weight': weight_stack, 'Rbi': Rbi_stack, 'xt': xt_stack, 'aoverline': a_overline_stack, 'Rtc': Rtc_stack, 'x_dbg': x_stack_dbg})
-print('File top.mat has been successfully saved. Now run the MATLAB script to optimize!')
+#io.savemat('top.mat', {'Aoverline': A_overline_stack, 'Boverline': B_overline_stack, 'rhs': rhs_stack, 'xinit': x_init_stack, 'weight': weight_stack, 'Rbi': Rbi_stack, 'xt': xt_stack, 'aoverline': a_overline_stack, 'Rtc': Rtc_stack, 'x_dbg': x_stack_dbg})
+#print('File top.mat has been successfully saved. Now run the MATLAB script to optimize!')

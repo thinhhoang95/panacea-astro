@@ -22,6 +22,6 @@ for i=1:length(xinit)
     Rtcs = reshape(Rtc(i,:,:),3,3);
     % Predicted position in IMU's frame
     x_hat = [eye(3),zeros(3)] * (Aov * x(1:9)' + aov * [0 0 9.78206]' + Bov * [R1' * xinit(i,1:3)'; 0; 0; 0]);
-    L(3*i+1:3*i+3) = weight(i)^4 * (x_hat - R1' * Ritip * xts' - R1' * Ritip * Rtcs' * rhs(i,:)');
+    L(3*i+1:3*i+3) = x_hat - R1' * Ritip * xts' - R1' * Ritip * Rtcs' * rhs(i,:)';
 end
 end

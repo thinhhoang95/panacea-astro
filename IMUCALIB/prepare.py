@@ -11,18 +11,18 @@ import os
 import scipy.io as io
 
 def get_tag_pos(tag_id):
-    if tag_id==5:
+    if tag_id==0:
         return np.array([0,0,0])
-    elif tag_id==4:
-        return np.array([0.093,0,0])
-    elif tag_id==3:
-        return np.array([0.186,0,0])
-    elif tag_id==0:
-        return np.array([0,-0.094,0])
-    elif tag_id==2:
-        return np.array([0.093,-0.094,0])
     elif tag_id==1:
-        return np.array([0.186,-0.093,0])
+        return np.array([0.09,0,0])
+    elif tag_id==2:
+        return np.array([0.18,0,0])
+    elif tag_id==3:
+        return np.array([0,-0.092,0])
+    elif tag_id==4:
+        return np.array([0.09,-0.092,0])
+    elif tag_id==5:
+        return np.array([0.18,-0.092,0])
     else:
         return None
 
@@ -110,7 +110,7 @@ for dir in run_directories:
                 dist = np.load('dist.pca.npy')
                 # Detect the markers in the image
                 markerCorners, markerIds, rejectedCandidates = cv.aruco.detectMarkers(frame, dictionary, parameters=parameters)
-                rvecs, tvecs, *other = cv.aruco.estimatePoseSingleMarkers(markerCorners, 0.088, cam_mat, dist)
+                rvecs, tvecs, *other = cv.aruco.estimatePoseSingleMarkers(markerCorners, 0.086, cam_mat, dist)
                 if image_path_cursor == 0:
                     # TODO: First frame is used for determination of the initial condition
                     x0_stack = np.empty((0,6))
@@ -161,9 +161,6 @@ for dir in run_directories:
                     a_circle_k = np.concatenate((np.array([[a_x,a_y,a_z,0,0,0],[0,0,0,a_y,a_z,0],[0,0,0,0,0,a_z]]), np.eye(3)), axis=1)
                     A_overline = A_overline + Acc @ Bm @ Rbi @ a_circle_k
                     a_overline = a_overline + Acc @ Bm
-
-                if each_frame_as_initial_flag:
-                    k_start = kp
                 
                 
                 # A_overline and B_overline is available, we proceed onto establishment of the measurement model for each ARUCO observation
@@ -195,14 +192,16 @@ for dir in run_directories:
                 cam_pos_average = np.average(cam_pos_estimate, axis=0)
                 if each_frame_as_initial_flag:
                     x_initial = cam_pos_average.copy() # TODO: delete or comment out this 
+                    B_overline = np.eye(6) # reset B_overline
                     print('Initial has been reset to ', x_initial)
+                    k_start = k # reset A_overline
                 ai_stack_dbg = np.concatenate((ai_stack_dbg, [ai]), axis=0)
-                x_hat = A_overline @ np.array([1,0,0,1,0,1,0,0,0]).T + a_overline @ np.array([0,0,9.78206]).T + B_overline @ x_initial.T
+                x_hat = A_overline @ np.array([0.8894,0.0297,-0.1052,0.9500,-0.0847,0.9028,-1.0043,-0.7695,-0.7234]).T + a_overline @ np.array([0,0,9.78206]).T + B_overline @ x_initial.T
                 #print('x_hat: ', x_hat)
                 #print('x_dbg: ', x_dbg)
                 cv.putText(image_draw, str('x_hat: ' + str(x_hat)), (10,10), cv.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255,255), 1)
-                cv.putText(image_draw, str('x_dbg: ' + str(x_dbg)), (10,20), cv.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255,255), 1)
-                cv.putText(image_draw, str('x_init: ' + str(x_initial)), (10,30), cv.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255,255), 1)
+                cv.putText(image_draw, str('x_dbg: ' + str(x_dbg)), (10,30), cv.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255,255), 1)
+                cv.putText(image_draw, str('x_init (reset): ' + str(x_initial)), (10,20), cv.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255,255), 1)
                 cv.imshow('Image '+image_info[image_path_cursor][1], image_draw)
                 cv.waitKey(1000)
                 cv.destroyAllWindows()
