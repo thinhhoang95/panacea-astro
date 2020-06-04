@@ -27,7 +27,7 @@ class PanaceaInertial3DS:
         self.img0_mss_pointer = 0 # pointer of the acquired img0 in the window, for MSS analysis
         self.img1_pointer = 0 # pointer of the acquired img1 in the window
         self.roll_pointer = 0
-        self.Q_mat = np.diag(1E-4 * np.array([5,5,5])) # covariance of acceleration
+        self.Q_mat = np.diag(1E-1 * np.array([50,50,5E-3])) # covariance of acceleration
         self.R_mat = 1E-8 * np.identity(2) # covariance of optical flow measurement
         
         # MSS Kalman Parameters
@@ -35,7 +35,10 @@ class PanaceaInertial3DS:
         self.measurement_var = 1E-8
 
         # IMU CALIBRATION PARAMETERS
-        self.S_mat = np.array([[1.0316,-0.0989,-0.0411,-0.0759],[0,1.0529,-0.0183,-0.0314],[0,0,1.0427,0.5049]])
+        # self.S_mat = np.array([[1.0316,-0.0989,-0.0411,-0.0759],[0,1.0529,-0.0183,-0.0314],[0,0,1.0427,0.5049]])
+        #self.S_mat = np.array([[0.9208,-0.0459,-0.0878,-0.8170],[0,0.9698,0.1506,1.4878],[0,0,0.6746,-2.7486]])
+        #self.S_mat = np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0]])
+        self.S_mat = np.array([[0.9208,-0.0459,-0.0878,-0.8170],[0,0.9698,0.1506,1.4878],[0,0,1,0]])
 
         # IMPORTING CAMERA PARAMETERS
         cam_mat = np.load('cam_mat.pca.npy')

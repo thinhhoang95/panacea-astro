@@ -26,8 +26,8 @@ def mpu_daq(smile_queue):
     imu = RTIMU.RTIMU(rtimu_settings)
     # Gyro offsets
     yawoff = 0.0
-    pitchoff = 5.17
-    rolloff = -4.99
+    pitchoff = 4.87
+    rolloff = -6
 
     print('Gyro offsets set')
 
