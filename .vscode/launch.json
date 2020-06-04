@@ -4,16 +4,17 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+
         
         {
             "name": "Python: Current File",
             "type": "python",
             "request": "launch",
-            //"program": "${file}",
-            "program": "panacea3ds.py",
+            "program": "${file}",
+            //"program": "panacea3ds.py",
             "console": "integratedTerminal",
-            "cwd": "/Users/thinhhoang/Downloads/Panacea_Calibration/FILTER/"
-            //"cwd": "C:/Users/USER/Documents/panacea-astro/IMUCALIB/"
+            //"cwd": "/Users/thinhhoang/Downloads/Panacea_Calibration/FILTER/"
+            "cwd": "/Users/thinhhoang/Downloads/Panacea_Calibration/IMUCALIB/"
             //"cwd": "C:/Users/USER/Documents/panacea-astro/CALIB/camera_calib"
         }
     ]

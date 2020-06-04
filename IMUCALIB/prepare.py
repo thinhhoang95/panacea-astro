@@ -27,9 +27,9 @@ def get_tag_pos(tag_id):
         return None
 
 # flags
-each_frame_as_initial_flag = True # if False, the first frame of the run will serve as initial position, otherwise, the last frame
+each_frame_as_initial_flag = False # if False, the first frame of the run will serve as initial position, otherwise, the last frame
 
-run_directories = ['run_'+str(i) for i in range(10)]
+run_directories = ['run_'+str(i) for i in range(20)]
 
 # Variables to hold components of measurements
 Rbi_stack = np.empty((0,3,3))
@@ -51,7 +51,7 @@ x_dbg = np.zeros(6)
 # Useful constants
 Ritip = np.array([[1,0,0],[0,-1,0],[0,0,-1]]) # flip y and z axis
 
-for dir in run_directories:
+for dir_no, dir in enumerate(run_directories):
 
     print('Now processing directory ', dir)
 
@@ -64,7 +64,10 @@ for dir in run_directories:
     image_info = []
     # Convert image name timestamp to a numpy vector
     for img_path in image_path:
-        image_info.append((img_path[23:len(img_path)-4],img_path))
+        if dir_no >= 10:
+            image_info.append((img_path[24:len(img_path)-4],img_path))
+        else:
+            image_info.append((img_path[23:len(img_path)-4],img_path))
     image_info.sort(key=lambda tup: tup[0])
     image_path_cursor = 0
     last_time = 0 # to calculate delta_t between timesteps
@@ -167,6 +170,11 @@ for dir in run_directories:
                 if markerIds is None or rvecs is None or tvecs is None:
                     print('This image does contain a ARUCO tag')
                     image_path_cursor = image_path_cursor + 1
+                    if each_frame_as_initial_flag:
+                        # x_initial = cam_pos_average.copy() # TODO: delete or comment out this 
+                        B_overline = np.eye(6) # reset B_overline
+                        print('Initial has been reset to ', x_initial)
+                        k_start = k # reset A_overline
                     continue
                 print('Found {:d} ARUCO tags'.format(len(markerIds)))
                 cam_pos_estimate = np.empty((0,6))

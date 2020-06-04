@@ -5,6 +5,7 @@ Calibration of IMU's accelerometer precisely through camera
 
 import numpy as np
 from scipy.spatial.transform import Rotation
+from scipy.linalg import block_diag
 import glob
 import cv2 as cv
 import os
@@ -125,7 +126,8 @@ for dir in run_directories:
                     # cv.imshow('Image '+image_info[image_path_cursor][1], image_draw)
                     # cv.waitKey(30000)
                     # cv.destroyAllWindows()
-                    x_initial = np.average(x0_stack, axis=0)
+                    Ripi = Rotation.from_euler('ZYX', np.array([-0.0678,0,0])).as_matrix() # I' (tag's z down) -> I (north aligned)
+                    x_initial = block_diag(Ripi, Ripi) @ np.average(x0_stack, axis=0) # TODO: delete or comment out this 
                     x_dbg = x_initial.copy()
                     B_overline = np.eye(6) # reset acceleration integrators upon reaching the first image
                     image_path_cursor = image_path_cursor + 1
@@ -190,18 +192,25 @@ for dir in run_directories:
                     cam_pos_estimate = np.concatenate((cam_pos_estimate, [cam_pos]), axis=0)
                     # cv.putText(image_draw, str(cam_pos[0:3]), (10,10*np.shape(cam_pos_estimate)[0]), cv.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255,255), 1)
                 cam_pos_average = np.average(cam_pos_estimate, axis=0)
-                if each_frame_as_initial_flag:
-                    x_initial = cam_pos_average.copy() # TODO: delete or comment out this 
+                if each_frame_as_initial_flag: 
+                    # HERE!!! ===>
+                    Ripi = Rotation.from_euler('ZYX', np.array([0,0,0])).as_matrix() # I' (tag's z down) -> I (north aligned)
+                    # HERE!! <====
+                    x_initial = block_diag(Ripi, Ripi) @ cam_pos_average.copy() # TODO: delete or comment out this 
                     B_overline = np.eye(6) # reset B_overline
                     print('Initial has been reset to ', x_initial)
                     k_start = k # reset A_overline
                 ai_stack_dbg = np.concatenate((ai_stack_dbg, [ai]), axis=0)
-                x_hat = A_overline @ np.array([0.8894,0.0297,-0.1052,0.9500,-0.0847,0.9028,-1.0043,-0.7695,-0.7234]).T + a_overline @ np.array([0,0,9.78206]).T + B_overline @ x_initial.T
+                # x_hat = A_overline @ np.array([0.8894,0.0297,-0.1052,0.9500,-0.0847,0.9028,-1.0043,-0.7695,-0.7234]).T + a_overline @ np.array([0,0,9.78206]).T + B_overline @ x_initial.T
+                # REMEMBER TO CHANGE THE VALUE IN Ripi ABOVE!
+                x_hat = A_overline @ np.array([1,0,0,1,0,1,0,0,0]).T + a_overline @ np.array([0,0,9.78206]).T + B_overline @ x_initial.T
                 #print('x_hat: ', x_hat)
                 #print('x_dbg: ', x_dbg)
-                cv.putText(image_draw, str('x_hat: ' + str(x_hat)), (10,10), cv.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255,255), 1)
-                cv.putText(image_draw, str('x_dbg: ' + str(x_dbg)), (10,30), cv.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255,255), 1)
+                cv.putText(image_draw, str('Euclidean Distance: ' + str(np.linalg.norm(x_hat[0:3] - x_initial[0:3]))), (10,10), cv.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255,255), 1)
+                # cv.putText(image_draw, str('x_dbg: ' + str(x_dbg)), (10,30), cv.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255,255), 1)
                 cv.putText(image_draw, str('x_init (reset): ' + str(x_initial)), (10,20), cv.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255,255), 1)
+                cv.putText(image_draw, str('x_init (reset): ' + str(x_initial)), (10,20), cv.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255,255), 1)
+                
                 cv.imshow('Image '+image_info[image_path_cursor][1], image_draw)
                 cv.waitKey(1000)
                 cv.destroyAllWindows()
