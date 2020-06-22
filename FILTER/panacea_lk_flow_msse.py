@@ -65,7 +65,7 @@ class PanaceaLKFlowMSS(PanaceaFlow):
 
     def calculate(self): # calculate the optical flow
         valid_track = False
-        vis = self.img2.copy() # draw the optical tracks on this vis object
+        vis = cv.cvtColor(self.img2.copy(),cv.COLOR_GRAY2RGB) # draw the optical tracks on this vis object
         if len(self.tracks) > 0:
                 img0, img1 = self.img1, self.img2
                 p0 = np.float32([tr[-1] for tr in self.tracks]).reshape(-1, 1, 2)
@@ -82,12 +82,12 @@ class PanaceaLKFlowMSS(PanaceaFlow):
                     if len(tr) > self.track_len:
                         del tr[0]
                     new_tracks.append(tr)
-                    cv.circle(vis, (x, y), 2, (0, 255, 0), -1)
+                    cv.circle(vis, (x, y), 2, (0, 255, 255), -1)
                     valid_track = True
                     # cv.circle(vis, (x, y), 2, (0, 255, 0), -1)
                 self.tracks = new_tracks
                 # print('Size of new tracks: ', np.shape(self.tracks))
-                cv.polylines(vis, [np.int32(tr) for tr in self.tracks], False, (0, 255, 0))
+                cv.polylines(vis, [np.int32(tr) for tr in self.tracks], False, (0, 255, 255))
                 # draw_str(vis, (20, 20), 'track count: %d' % len(self.tracks))
 
         if self.frame_idx % self.detect_interval == 0:
@@ -124,7 +124,7 @@ class PanaceaLKFlowMSS(PanaceaFlow):
                 self.tracks.append([(x, y)])
 
     def revisualize_of(self, tracks, x_k, x_kp, camera_ray_length_k, camera_ray_length_kp, Ric_k, Ric_kp):
-        vis = self.img2.copy()
+        vis = cv.cvtColor(self.img2.copy(),cv.COLOR_GRAY2RGB)
         # Draw the tracks on the frame
         for track in tracks:
             if (len(track)==1):

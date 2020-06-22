@@ -15,7 +15,7 @@ class PanaceaInertial3DS:
         self.window_size = 9999 # maximum number of states, depending on how fast algorithm operates
         # state includes 3 position, 3 velocity, 3 scale factor, 3 bias terms
         self.X = np.zeros((self.window_size, 6)) # state vector
-        self.X[0,:] = np.array([0,0,-1.67,0,0,0]) # initial condition
+        self.X[0,:] = np.array([0,0,-1.13,0,0,0]) # initial condition
         self.YPR = np.zeros((self.window_size, 3)) # yaw pitch roll of Rbi 
         self.P = np.zeros((self.window_size, 6, 6)) # covariance matrix of state
         self.theta = np.array([1,1,1,0,0,0]) # 3 scale factors and 3 bias factors
@@ -27,7 +27,7 @@ class PanaceaInertial3DS:
         self.img0_mss_pointer = 0 # pointer of the acquired img0 in the window, for MSS analysis
         self.img1_pointer = 0 # pointer of the acquired img1 in the window
         self.roll_pointer = 0
-        self.Q_mat = np.diag(1E-1 * np.array([50,50,5E-3])) # covariance of acceleration
+        self.Q_mat = np.diag(1E-1 * np.array([50,50,50])) # covariance of acceleration
         self.R_mat = 1E-8 * np.identity(2) # covariance of optical flow measurement
         
         # MSS Kalman Parameters
@@ -90,7 +90,7 @@ class PanaceaInertial3DS:
     '''
     Propagate IMU state upon receive of new acceleration
     '''
-    def imu_propagate(self, ab, ypr, T):
+    def imu_propagate(self, ab, ypr, T, velocity_reset_flag):
         if (self.now_pointer + 1 >= self.window_size):
             # Pointer is now outside of the window
             raise Exception('The window size is too small! Try to increase it')
@@ -106,7 +106,7 @@ class PanaceaInertial3DS:
         # u = np.concatenate(((Rbi @ self.Ritpt @ ab.T + np.array([0,0,1]))*9.78206, np.array([1])))
         # u = np.array([0,0,0]) # disable IMU updates, uses camera only
         u = Rbi @ self.S_mat @ np.concatenate((ab*9.78206,[1])).T + np.array([0,0,9.78206]).T # with normal IMU update
-        # self.accel_log = np.vstack((self.accel_log, (Rbi @ self.Ritpt @ ab.T + np.array([0,0,1]))*9.78206))
+        self.accel_log = np.vstack((self.accel_log, u))
         B = B_mat_1
         next_state = A_mat @ self.X[self.now_pointer,:].T + B @ u.T
         next_state[3:6] = np.zeros(3) # zeroing out the velocity so that there won't be any drift
@@ -324,6 +324,9 @@ class PanaceaInertial3DS:
         # print('KAL/OTF change in residual: {:f} => {:f}'.format(residue_norm_before, residue_norm))
         # MAP estimation of accelerometer settings
         # self.map_theta(x_kp_new, P_kp_new)
+
+        if self.img0_pointer == 0:
+            x_kp_new = x_k.copy()
 
         # Update state and repropagation from img1_pt to now
         # self.X[self.img1_pointer, :] = np.hstack((x_kp_new_ols,np.array([0,0,0]))) # <- OLS not KAL

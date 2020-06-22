@@ -33,7 +33,9 @@ def main():
     frame_skip_count = 1
     oldest_state_index = 0
     frame_skip = 0 # skip 1 image frame
+    accel_row_index = 0
     for accel_row, ypr_row in zip(accel_data, ypr_data):
+        accel_row_index = accel_row_index + 1
         time = accel_row[0]
         if (t_first == 0):
             t_first = time
@@ -45,7 +47,10 @@ def main():
             x_log = np.vstack((x_log, filter.X[filter.now_pointer, 0:3]))
             t_log = np.append(t_log, time - t_first)
             # print('IMU Calibration: ', filter.theta)
-            filter.imu_propagate(accel, ypr, time - last_time)
+            reset_vel = False
+            if accel_row_index % 5 == 0:
+                reset_vel = True
+            filter.imu_propagate(accel, ypr, time - last_time, reset_vel)
             # upon reaching the moment with an image captured
             if image_path_cursor >= len(image_path):
                 break # no more images to process, stop!
@@ -53,7 +58,6 @@ def main():
                 if frame_skip_count < frame_skip:
                     frame_skip_count = frame_skip_count + 1
                     image_path_cursor = image_path_cursor + 1
-                    continue
                 frame_skip_count = 0
                 if not img0_path:
                     # First image frame detection
@@ -61,6 +65,7 @@ def main():
                     filter.set_img_pointer(filter.now_pointer, 0)
                     img0_mss_path = img0_path
                     lk_flow.first_frame_track_generate(img0_path)
+                    filter = PanaceaInertial3DS() # reset the filter at the beginning of first frame captured
                 else:
                     # print('Img1 set at clock ', time)
                     img1_path = image_info[image_path_cursor][1]
@@ -69,6 +74,8 @@ def main():
                     lk_flow.set_mss_frame(img0_mss_path) # mss_path might not coincide with img0 path as they might not be swapped with img1 
                     filter.set_img_pointer(filter.img0_pointer, filter.now_pointer)
                     flow_tracks = lk_flow.calculate() # calculate the optical flow between two images
+                    if len(flow_tracks)>200:
+                        flow_tracks = flow_tracks[0:200]
                     valid_tracks_in_flow_tracks = len(flow_tracks)
                     for track in flow_tracks:
                         if len(track)==1:
@@ -79,9 +86,9 @@ def main():
                         print('<!> Frame ', img1_path, ': OF was skipped due to insufficient odometry information available')
                         # If optical flow is not available, high chance is that img1 contains little keypoints!
                         # Let's perform detect_and_match without moving the img0 pointer forward (to the little keypoints frame)
-                        ftracks, tracks_marginalize, oldest_state_index_ftracks, oldest_state_index_marginalize, longest_flow_components, longest_frame_count = lk_flow.detect_and_match(filter.roll_pointer + filter.img0_mss_pointer, filter.roll_pointer + filter.img1_pointer)
-                        filter.mss_cam_correction(tracks_marginalize) # no altering img0_mss path or pointer
-                        oldest_state_index = min(oldest_state_index_ftracks, oldest_state_index_marginalize)
+                        #ftracks, tracks_marginalize, oldest_state_index_ftracks, oldest_state_index_marginalize, longest_flow_components, longest_frame_count = lk_flow.detect_and_match(filter.roll_pointer + filter.img0_mss_pointer, filter.roll_pointer + filter.img1_pointer)
+                        # filter.mss_cam_correction(tracks_marginalize) # no altering img0_mss path or pointer
+                        #oldest_state_index = min(oldest_state_index_ftracks, oldest_state_index_marginalize)
                         img0_path = img1_path # Skip to the next consecutive pair
                         img1_path = ''
                         # adjusting the image pointer
@@ -114,11 +121,12 @@ def main():
     plt.plot(filter.res_norm_log)
     plt.plot(filter.res_norm_corrected_log)
     accel_inertial_fig = plt.figure(3)
-    plt.plot(filter.res_norm_corrected_ols_log)
+    plt.plot(filter.accel_log)
     plt.show()
 
     # Saving x_log to file
     np.savetxt('x_log.csv', x_log, delimiter=',')
+    np.savetxt('t_log.csv', t_log, delimiter=',')
 
 if __name__=='__main__':
     main()

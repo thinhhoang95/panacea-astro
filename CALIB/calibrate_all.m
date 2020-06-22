@@ -2,6 +2,20 @@ clear all;
 close all;
 clc;
 
+% !!! IMPORTANT FOR USERS !!!
+% NOTE: var_3D should take from 1 to N as N first samples correspond to the
+% long immobile period at the beginning. N might need to be modified if
+% immobile period is not long enough.
+% The code z=find(vec==min(min(vec))); could be set to z=3 (for example) as too small
+% times_the_var might lead to overfitting. 
+
+% After optimization, theta_pr_opt 1:7 values (displayed in the Command
+% Window) are ready to be put straight into RTIMULib.ini file!
+
+% Remaining bias term may be corrected manually by running the script and
+% observe Ax, Ay, Az so that the acceleration in horizontal plane must be
+% zero. Add to the bias term A_observed * 9.78206   
+
 % Importing data 
 IMU0x2Dalpha = csvread('accelerometer.txt');
 IMU0x2Domega = csvread('gyroscope.txt');
@@ -31,7 +45,7 @@ omega_z = IMU0x2Domega(:,2)' * pi/180 - offset_gyro_z*ones(1,total_sample);
 
 %% Static State Statistical Filter
 
-var_3D = (var(a_xp(1:2800))^2 + var(a_yp(1:2800))^2 + var(a_zp(1:2800))^2);
+var_3D = (var(a_xp(1:1600))^2 + var(a_yp(1:1600))^2 + var(a_zp(1:1600))^2);
 
 w_d = 101;               % Window's dimension
 
@@ -199,6 +213,7 @@ end
 vec = res_norm_vector(10,:);  
 
 z=find(vec==min(min(vec)));
+% z=3;
 
 threshold_opt = res_norm_vector(11,z);
 

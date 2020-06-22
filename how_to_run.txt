@@ -1,0 +1,13 @@
+1. Calibrate the camera to get the camera intrinsic and distortion matrix.
+2. Calibrate the magnetometer and accelerometer usin RTIMULib's default library.
+2. Reset the RTIMULib.ini Panacea scale to 1 and bias to zero.
+2. Modify the imu_reader_accel_calib.py, set rolloff, pitchoff, yawoff to zero.
+3. Run the script imu_reader_accel_calib.py in CALIB and perform immobile accelerometer calibration (500s).
+4. Run the optimization script for immobile calibration. Read the notes in there (calibrate_all.m).
+5. Put the new values into Panacea_XXX entries in RTIMULib.ini.
+6. Manually compensate for small remaining residual bias, if neccessary (see notes in the optimize.m file).
+6. Run the script again, note the roll, pitch, yaw: these are rolloff, pitchoff and yawoff angles.
+7. Run IMU-ARUCO Calibration(IMUCALIB folder) if neccessary.
+8. Edit the daq_main.py, put the rolloff, pitchoff, yawoff angles. Change the maximum number of images to be captured if neccessary.
+9. Start the daq_main.py script with enough lighting condition.
+10. Check the images before proceeding on filter.
