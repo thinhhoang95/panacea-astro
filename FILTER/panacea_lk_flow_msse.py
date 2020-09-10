@@ -19,7 +19,7 @@ class PanaceaLKFlowMSS(PanaceaFlow):
                         blockSize = 5 )
     ftracks = [] # contains the multi-keyframe points
 
-    show_cv_debug = False
+    show_cv_debug = True
 
     def __init__(self, img1, img2):
         super().__init__(img1, img2)

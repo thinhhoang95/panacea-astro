@@ -12,15 +12,15 @@ from matplotlib import pyplot as plt
 
 def main():
     filter = PanaceaInertial3DS()
-    accel_data = np.genfromtxt('inertial/accel.txt', delimiter=',')
-    ypr_data = np.genfromtxt('inertial/eulang.txt', delimiter=',')
+    accel_data = np.genfromtxt('inertial_ll/accel.txt', delimiter=',')
+    ypr_data = np.genfromtxt('inertial_ll/eulang.txt', delimiter=',')
     # image_path = glob.glob('images/*0125*.jpg') + glob.glob('images/*0126*.jpg') + glob.glob('images/*0127*.jpg') + glob.glob('images/*0128*.jpg') + glob.glob('images/*0129*.jpg') + glob.glob('images/*0130*.jpg') + glob.glob('images/*0131*.jpg') + glob.glob('images/*0132*.jpg')
-    image_path = glob.glob('images/*.jpg')
+    image_path = glob.glob('images_ll/*.jpg')
     image_info = []
     lk_flow = PanaceaLKFlowMSS(None, None)
     # Convert image name timestamp to a numpy vector
     for img_path in image_path:
-        image_info.append((img_path[17:len(img_path)-4],img_path))
+        image_info.append((img_path[20:len(img_path)-4],img_path))
     image_info.sort(key=lambda tup: tup[0])
     image_path_cursor = 0
     last_time = 0 # to calculate delta_t between timesteps

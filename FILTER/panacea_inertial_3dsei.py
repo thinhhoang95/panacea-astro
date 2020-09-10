@@ -15,7 +15,7 @@ class PanaceaInertial3DS:
         self.window_size = 9999 # maximum number of states, depending on how fast algorithm operates
         # state includes 3 position, 3 velocity, 3 scale factor, 3 bias terms
         self.X = np.zeros((self.window_size, 6)) # state vector
-        self.X[0,:] = np.array([0,0,-1.13,0,0,0]) # initial condition
+        self.X[0,:] = np.array([0,0,-1.68,0,0,0]) # initial condition
         self.YPR = np.zeros((self.window_size, 3)) # yaw pitch roll of Rbi 
         self.P = np.zeros((self.window_size, 6, 6)) # covariance matrix of state
         self.theta = np.array([1,1,1,0,0,0]) # 3 scale factors and 3 bias factors

@@ -6,11 +6,11 @@ import math
 from scipy.spatial.transform import Rotation
 from matplotlib import pyplot as plt
 
-image_path = glob.glob('images/*.jpg')
+image_path = glob.glob('images_ll/*.jpg')
 image_info = []
 # Convert image name timestamp to a numpy vector
 for img_path in image_path:
-    image_info.append((img_path[17:len(img_path)-4],img_path))
+    image_info.append((img_path[20:len(img_path)-4],img_path))
 image_info.sort(key=lambda tup: tup[0])
 image_path_cursor = 0
 
